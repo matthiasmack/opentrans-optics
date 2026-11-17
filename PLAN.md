@@ -18,7 +18,8 @@ Kotlin data classes, edited with Arrow optics and created with a Kotlin DSL.
   reflection, annotations or compiler plugin), and reading, writing,
   validation and optics follow from that description. UDX without a
   definition (e.g. from another partner) is kept as a generic XML tree and
-  written back unchanged. Exporting an XSD from a definition may follow.
+  written back unchanged. Exporting an XSD from a definition is an idea,
+  not a planned step.
 - Kotlin-only API, DSL wherever it helps. JDK 25.
 - Model is generated from the XSD (KotlinPoet) after the spike.
 - `BigDecimal` for amounts and quantities. Dates are a `DateTime` value class
@@ -346,20 +347,22 @@ G9. Typed UDX as a user extension point. ✔
       the hand-written order DSL `udx { ... }`.
     - Example types (`ProjectUdx`, `CostCenterUdx`, `ShippingUdx`) live in
       the model's test fixtures only; the library ships no dialect.
-    - Not done yet: XSD export from a UdxType, user XSDs for lax validation.
+    - Ideas, not planned: XSD export from a UdxType, user XSDs for lax
+      validation.
 
 ## After the generator
 
 6. ~~Generator for the full schema~~ (see above).
-7. DSL for all document types, deriving ORDERRESPONSE / DISPATCHNOTIFICATION /
-   INVOICE from an ORDER.
+7. ~~DSL for all document types, deriving ORDERRESPONSE / DISPATCHNOTIFICATION /
+   INVOICE from an ORDER~~ (G6).
 8. ~~Typed UDX~~ (G9).
 9. Publishing (local Nexus, later Maven), MIT license.
 
 ## Notes
 
-- The bundled XSDs are © Fraunhofer IAO / Universität Duisburg-Essen BLI and
-  may be redistributed with their copyright notice (see header of
-  `opentrans_2_1.xsd`); the notice is kept unchanged in the files.
+- The bundled XSDs may be redistributed with their copyright notices, which
+  are kept unchanged in the files: openTRANS © Fraunhofer IAO / Universität
+  Duisburg-Essen BLI, BMEcat © BME e.V., xmldsig and xmlmime © W3C (W3C
+  Software License). The library code is MIT (`LICENSE`).
 - All four official samples in `opentrans-xml/src/test/resources/samples`
   validate against the bundled XSD (checked with `xmllint`).
