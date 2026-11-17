@@ -30,7 +30,7 @@ class DocumentReadTest {
         assertEquals(listOf(PartyRole.BUYER), info.parties.single().partyRoles)
         assertEquals("VISA", assertIs<Card>(info.payment?.method).type)
         assertEquals(2, info.parties.single().addresses.single().contactDetails.single().contactNames.size)
-        assertContains(info.headerUdx!!.content, "user defined extension on header-level")
+        assertContains(info.headerUdx!!.text, "user defined extension on header-level")
         assertEquals(order.orderSummary.totalItemNum, order.orderItems.size)
     }
 

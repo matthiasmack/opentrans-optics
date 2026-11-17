@@ -39,8 +39,9 @@ import java.io.File
 class DslEmitter(private val pkg: String, private val modelPkg: String) {
     private val model = ModelEmitter(modelPkg)
     private val dslMarker = ClassName(pkg, "OpenTransDsl")
-    private val rawXml = ClassName("opentrans.model", "RawXml")
+    private val rawXml = ClassName("opentrans.model", "XmlContent")
     private val bigDecimal = ClassName("java.math", "BigDecimal")
+    private val contentBuilder = ClassName(pkg, "XmlContentBuilder")
 
     fun emit(ir: Ir, outDir: File) {
         val file = FileSpec.builder(pkg, "GeneratedBuilders")
@@ -125,7 +126,10 @@ class DslEmitter(private val pkg: String, private val modelPkg: String) {
             is KType.Scalar -> scalarHelpers(name, t.kind) { "this.%N = %L" }
             KType.Raw -> listOf(
                 FunSpec.builder(name).addParameter("xml", STRING)
-                    .addStatement("this.%N = %T(xml.trim())", name, rawXml).build(),
+                    .addStatement("this.%N = %T.parse(xml)", name, rawXml).build(),
+                FunSpec.builder(name)
+                    .addParameter("block", LambdaTypeName.get(receiver = contentBuilder, returnType = UNIT))
+                    .addStatement("this.%N = %T().apply(block).build()", name, contentBuilder).build(),
             )
             is KType.Choice -> t.def.variants.flatMap { variant ->
                 val helper = members.claimOrNull(variant.cls.name.replaceFirstChar(Char::lowercase)) ?: return@flatMap emptyList()

@@ -76,7 +76,7 @@ val spikeOrder = Order(
                 Remark("Bitte an Tor 2 liefern.", type = "general", lang = "deu"),
                 Remark("fragile", type = "transport"),
             ),
-            headerUdx = RawXml(
+            headerUdx = XmlContent.parse(
                 """<UDX.CUSTOM xmlns="urn:example:udx"><PROJECT>project-7</PROJECT><PRIORITY level="high"/></UDX.CUSTOM>""",
             ),
         ),
@@ -94,7 +94,7 @@ val spikeOrder = Order(
             orderUnit = "C62",
             productPriceFix = ProductPriceFix(BigDecimal("0.15"), priceQuantity = BigDecimal("1")),
             priceLineAmount = BigDecimal("15.00"),
-            itemUdx = RawXml("""<UDX.CUSTOM xmlns="urn:example:udx"><COST_CENTER>cc-42</COST_CENTER></UDX.CUSTOM>"""),
+            itemUdx = XmlContent.parse("""<UDX.CUSTOM xmlns="urn:example:udx"><COST_CENTER>cc-42</COST_CENTER></UDX.CUSTOM>"""),
         ),
         OrderItem(
             lineItemId = "2",

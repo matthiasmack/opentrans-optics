@@ -23,7 +23,7 @@ const val DOCUMENT_INTERFACE = "OpenTransDocument"
 class ModelEmitter(private val pkg: String) {
     private val optics = ClassName("arrow.optics", "optics")
     private val dateTime = ClassName("opentrans.model", "DateTime")
-    private val rawXml = ClassName("opentrans.model", "RawXml")
+    private val rawXml = ClassName("opentrans.model", "XmlContent")
 
     private val document = ClassName(pkg, DOCUMENT_INTERFACE)
     private var roots: Set<ClassDef> = emptySet()

@@ -12,6 +12,13 @@ Kotlin data classes, edited with Arrow optics and created with a Kotlin DSL.
 - Round trip only has to be semantically equal, not byte-identical.
 - No signatures. `HEADER_UDX` / `ITEM_UDX` are carried as raw XML first and
   will get typed access later.
+- **UDX are a user extension point.** The library ships no UDX dialect; its
+  users define their own types. UDX in the wild rarely comes with an XSD, so
+  none is required: a UDX type is described once in Kotlin (explicitly, no
+  reflection, annotations or compiler plugin), and reading, writing,
+  validation and optics follow from that description. UDX without a
+  definition (e.g. from another partner) is kept as a generic XML tree and
+  written back unchanged. Exporting an XSD from a definition may follow.
 - Kotlin-only API, DSL wherever it helps. JDK 25.
 - Model is generated from the XSD (KotlinPoet) after the spike.
 - `BigDecimal` for amounts and quantities. Dates are a `DateTime` value class
@@ -88,6 +95,7 @@ Step 2 (XML):
 - **UDX** is captured as XML text without indentation whitespace. Namespace
   prefixes declared further up (e.g. `bmecat:`) are re-declared inside the
   captured content, so it stays self-contained when written elsewhere.
+  (Superseded in G9: UDX is now an `XmlContent` tree.)
 - **Hardening findings.**
   - The schema must be loaded with external access disabled; imports are
     served from the classpath. `xmldsig-core-schema.xsd` has a DOCTYPE that
@@ -190,7 +198,7 @@ already resolved.
 - **Repeated sequences** (ADDRESS: EMAIL + PUBLIC_KEY*) -> list of a small
   class for one repetition.
 - **Raw content.** `xsd:anyType` / `xsd:any` (UDX) and the whole xmldsig
-  subtree (`XML_SIGNATURE`) -> `RawXml`.
+  subtree (`XML_SIGNATURE`) -> `XmlContent` (XML tree, see G9).
 - **Invariants.** `init { require(...) }` for repeated elements with
   minOccurs >= 1. Facet checks (pattern, length) come in a later step.
 - **Optics.** Every generated class and sealed interface gets `@optics` and a
@@ -248,7 +256,7 @@ G5. Replace the spike's hand-written model/reader/writer; every official
     sample reads, writes and validates. ✔
     - Generated model in `opentrans.model`, generated reader/writer in
       `opentrans.xml` (internal). Hand-written code left: `DateTime`,
-      `RawXml`, `XmlIn`/`XmlOut` (cursor and serializer helpers),
+      `RawXml` (replaced by `XmlContent` in G9), `XmlIn`/`XmlOut` (cursor and serializer helpers),
       `OpenTransSchema` (validation and hardening), `OpenTransXml` (API),
       and the DSL.
     - Public API: `OpenTransXml.read(xml)` returns any `OpenTransDocument`
@@ -310,13 +318,42 @@ G8. Names cleaned up before the first release. ✔
     - Plurals with a trailing digit: `names2`, `referenceFeatureGroupIds2`.
     - The remaining `<Parent>Choice` names (`SignatureChoice`,
       `FtValueChoice`, ...) follow the default rule and are left as they are.
+G9. Typed UDX as a user extension point. ✔
+    - Layer 1: `RawXml` is replaced by `XmlContent`, an immutable,
+      namespace-aware tree (`XmlElement`, `XmlText`) for every xsd:anyType
+      element (UDX and XML_SIGNATURE). Equality is semantic (namespace +
+      local name, prefixes are only hints). `XmlContent.parse(xml)` is
+      hardened like the document reader. The writer declares only the
+      namespaces the content needs, relative to the root's declarations;
+      elements without a namespace get `xmlns=""`.
+    - Layer 2 (`opentrans.udx`): a user describes a UDX element once as
+      `object XUdx : UdxType<X>("UDX.ACME.X", "urn:acme") { ... }` with
+      `required` / `optional` / `list` / `attribute` / `optionalAttribute`
+      fields, simple types (`string`, `int`, `decimal`, `boolean`, `date`,
+      `dateTime`, `enum`, or a custom `SimpleType`) and nested UdxTypes, plus
+      `create(v)`. Reading and writing both check the rules and throw
+      `UdxViolationException` with the path
+      (`UDX.ACME.SHIPPING/CARRIER: at most 10 characters, got 11`).
+      Strict: unknown elements/attributes and stray text are refused; child
+      order is free on read, declaration order on write. Children live in the
+      namespace of their parent.
+    - Access: `content[XUdx]`, `getAll`, `with`, `withAll` (in place, foreign
+      UDX untouched); optics `Order.orderHeader.orderInfo.headerUdx.udx(XUdx)`
+      (Optional, `set` creates the content) and on traversals
+      (`Order.orderItems.every.itemUdx.udx(XUdx)`).
+    - DSL: `XmlContentBuilder` (`add(type, value)`, `xml(...)`, `element`,
+      `text`); generated builders get `headerUdx { ... }` / `itemUdx { ... }`,
+      the hand-written order DSL `udx { ... }`.
+    - Example types (`ProjectUdx`, `CostCenterUdx`, `ShippingUdx`) live in
+      the model's test fixtures only; the library ships no dialect.
+    - Not done yet: XSD export from a UdxType, user XSDs for lax validation.
 
 ## After the generator
 
 6. ~~Generator for the full schema~~ (see above).
 7. DSL for all document types, deriving ORDERRESPONSE / DISPATCHNOTIFICATION /
    INVOICE from an ORDER.
-8. Typed UDX.
+8. ~~Typed UDX~~ (G9).
 9. Publishing (local Nexus, later Maven), MIT license.
 
 ## Notes

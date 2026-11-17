@@ -45,7 +45,7 @@ object Names {
     )
 
     /** Hand-written types in the model package; generated names must never collide with them. */
-    val reserved = setOf("DateTime", "RawXml")
+    val reserved = setOf("DateTime", "XmlContent", "XmlNode", "XmlElement", "XmlText")
 
     /** Property names, keyed by "OwnerClass.defaultName". */
     private val propertyOverrides = mapOf(

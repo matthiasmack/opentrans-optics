@@ -5,7 +5,15 @@ import arrow.optics.dsl.notNull
 import opentrans.model.FacetViolationException
 import opentrans.model.Invoice
 import opentrans.model.Order
-import opentrans.model.RawXml
+import opentrans.model.XmlContent
+import opentrans.model.XmlElement
+import opentrans.model.XmlText
+import opentrans.udx.Level
+import opentrans.udx.Priority
+import opentrans.udx.Project
+import opentrans.udx.ProjectUdx
+import opentrans.udx.get
+import opentrans.udx.with
 import opentrans.model.headerUdx
 import opentrans.model.orderHeader
 import opentrans.model.orderId
@@ -73,16 +81,15 @@ class OrderXmlTest {
 
     @Test
     fun `UDX content keeps namespaces declared further up`() {
-        val order = OpenTransXml.readAs<Order>(withHeaderUdx("<bmecat:NOTE>text &amp; more</bmecat:NOTE>"))
-        assertEquals(
-            RawXml("""<bmecat:NOTE xmlns:bmecat="http://www.bmecat.org/bmecat/2005">text &amp; more</bmecat:NOTE>"""),
-            order.orderHeader.orderInfo.headerUdx,
-        )
+        val udx = OpenTransXml.readAs<Order>(withHeaderUdx("<bmecat:NOTE>text &amp; more</bmecat:NOTE>")).orderHeader.orderInfo.headerUdx!!
+        assertEquals(XmlContent(XmlElement("NOTE", BMECAT, "bmecat", children = listOf(XmlText("text & more")))), udx)
+        // On its own the content declares the namespace it needs.
+        assertEquals("""<bmecat:NOTE xmlns:bmecat="http://www.bmecat.org/bmecat/2005">text &amp; more</bmecat:NOTE>""", udx.toXml())
     }
 
     @Test
     fun `UDX may contain plain text`() {
-        assertEquals(RawXml("just text"), OpenTransXml.readAs<Order>(withHeaderUdx("  just text  ")).orderHeader.orderInfo.headerUdx)
+        assertEquals(XmlContent.text("just text"), OpenTransXml.readAs<Order>(withHeaderUdx("  just text  ")).orderHeader.orderInfo.headerUdx)
     }
 
     // --- strictness ---
@@ -102,9 +109,40 @@ class OrderXmlTest {
 
     @Test
     fun `XSD validation on write still catches what the facet checks cannot`() {
-        // UDX content is free XML; only the parser notices that it is not well-formed.
-        val broken = Order.orderHeader.orderInfo.headerUdx.set(spikeOrder, RawXml("<open>"))
-        assertFailsWith<OpenTransValidationException> { OpenTransXml.write(broken) }
+        // UDX content is checked laxly: elements the schema declares must be valid, here an openTRANS ORDER_DATE.
+        val udx = XmlContent(XmlElement("ORDER_DATE", OT, children = listOf(XmlText("not a date"))))
+        val broken = Order.orderHeader.orderInfo.headerUdx.set(spikeOrder, udx)
+        val error = assertFailsWith<OpenTransValidationException> { OpenTransXml.write(broken) }
+        assertContains(error.message!!, "not a date")
+    }
+
+    @Test
+    fun `UDX elements without a namespace are written outside the openTRANS default namespace`() {
+        val udx = XmlContent(XmlElement("UDX.PLAIN", children = listOf(XmlText("x"))))
+        val order = Order.orderHeader.orderInfo.headerUdx.set(spikeOrder, udx)
+        val xml = OpenTransXml.write(order)
+        assertContains(xml, """<HEADER_UDX><UDX.PLAIN xmlns="">x</UDX.PLAIN></HEADER_UDX>""")
+        assertEquals(udx, OpenTransXml.readAs<Order>(xml).orderHeader.orderInfo.headerUdx)
+    }
+
+    @Test
+    fun `typed UDX survive writing and reading next to foreign UDX`() {
+        val foreign = XmlElement("UDX.PARTNER", "urn:partner", "p", children = listOf(XmlText("untouched")))
+        val udx = XmlContent(foreign).with(ProjectUdx, Project("project-9", Priority(Level.LOW)))
+        val order = Order.orderHeader.orderInfo.headerUdx.set(spikeOrder, udx)
+
+        val back = OpenTransXml.readAs<Order>(OpenTransXml.write(order))
+
+        assertEquals(order, back)
+        assertEquals(Project("project-9", Priority(Level.LOW)), back.orderHeader.orderInfo.headerUdx!![ProjectUdx])
+        assertEquals(foreign, back.orderHeader.orderInfo.headerUdx!!.elements.first())
+    }
+
+    @Test
+    fun `malformed UDX text is refused where it is parsed`() {
+        assertFailsWith<IllegalArgumentException> { XmlContent.parse("<open>") }
+        assertFailsWith<IllegalArgumentException> { XmlContent.parse("<a/></content><content>") }
+        assertFailsWith<IllegalArgumentException> { XmlContent.parse("<p:a/>") }
     }
 
     // --- hardening ---

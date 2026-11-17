@@ -17,7 +17,7 @@ import opentrans.model.PartyRole
 import opentrans.model.Payment
 import opentrans.model.ProductId
 import opentrans.model.ProductPriceFix
-import opentrans.model.RawXml
+import opentrans.model.XmlContent
 import opentrans.model.SupplierPid
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -66,7 +66,7 @@ class NewOrderBuilder internal constructor(private val id: String, private val d
     private val otherParties = mutableListOf<Party>()
     private var payment: Payment? = null
     private val remarks = NewRemarksBuilder()
-    private var udx: RawXml? = null
+    private var udx: XmlContent? = null
     private val items = mutableListOf<NewOrderItemBuilder>()
 
     fun delivery(from: Any, to: Any = from, type: DeliveryDateType? = null) {
@@ -97,6 +97,11 @@ class NewOrderBuilder internal constructor(private val id: String, private val d
     /** HEADER_UDX content as XML text. */
     fun udx(xml: String) {
         udx = opentrans.dsl.udx(xml)
+    }
+
+    /** HEADER_UDX content, built from typed UDX and XML: `udx { add(ProjectInfoUdx, info) }`. */
+    fun udx(block: XmlContentBuilder.() -> Unit) {
+        udx = opentrans.dsl.udx(block)
     }
 
     fun item(quantity: Number, unit: String, lineItemId: String? = null, block: NewOrderItemBuilder.() -> Unit) {
@@ -154,7 +159,7 @@ class NewOrderItemBuilder internal constructor(
     private val descriptionsLong = mutableListOf<MlString>()
     private var priceFix: ProductPriceFix? = null
     private val remarks = NewRemarksBuilder()
-    private var udx: RawXml? = null
+    private var udx: XmlContent? = null
 
     /** PRICE_LINE_AMOUNT; computed from quantity and price when not set. */
     var lineAmount: BigDecimal? = null
@@ -191,6 +196,11 @@ class NewOrderItemBuilder internal constructor(
     /** ITEM_UDX content as XML text. */
     fun udx(xml: String) {
         udx = opentrans.dsl.udx(xml)
+    }
+
+    /** ITEM_UDX content, built from typed UDX and XML: `udx { add(ProjectInfoUdx, info) }`. */
+    fun udx(block: XmlContentBuilder.() -> Unit) {
+        udx = opentrans.dsl.udx(block)
     }
 
     internal fun build(defaultLineItemId: String) = OrderItem(

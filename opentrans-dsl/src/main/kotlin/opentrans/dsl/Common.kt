@@ -9,7 +9,11 @@ import opentrans.model.MlString
 import opentrans.model.Party
 import opentrans.model.PartyId
 import opentrans.model.PartyRole
-import opentrans.model.RawXml
+import opentrans.model.XmlContent
+import opentrans.model.XmlElement
+import opentrans.model.XmlNode
+import opentrans.model.XmlText
+import opentrans.udx.UdxType
 import opentrans.model.Remark
 import java.math.BigDecimal
 import java.time.LocalDate
@@ -118,4 +122,41 @@ class NewAddressBuilder internal constructor() {
     )
 }
 
-internal fun udx(xml: String) = RawXml(xml.trim())
+internal fun udx(xml: String) = XmlContent.parse(xml)
+
+/**
+ * Builds UDX (or other free XML) content:
+ *
+ * ```
+ * headerUdx {
+ *     add(ProjectInfoUdx, ProjectInfo("project-7", Priority.HIGH, emptyList()))
+ *     xml("""<UDX.OTHER xmlns="urn:partner">...</UDX.OTHER>""")
+ * }
+ * ```
+ */
+@OpenTransDsl
+class XmlContentBuilder internal constructor() {
+    private val nodes = mutableListOf<XmlNode>()
+
+    /** Adds the element of a typed UDX; checks the value against its type. */
+    fun <T> add(type: UdxType<T>, value: T) {
+        nodes += type.write(value)
+    }
+
+    /** Adds parsed XML text: elements and text. */
+    fun xml(xml: String) {
+        nodes += XmlContent.parse(xml).nodes
+    }
+
+    fun element(element: XmlElement) {
+        nodes += element
+    }
+
+    fun text(text: String) {
+        nodes += XmlText(text)
+    }
+
+    internal fun build() = XmlContent(nodes.toList())
+}
+
+internal fun udx(block: XmlContentBuilder.() -> Unit) = XmlContentBuilder().apply(block).build()

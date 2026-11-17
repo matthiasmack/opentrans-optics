@@ -1,6 +1,6 @@
 package opentrans.xml
 
-import opentrans.model.RawXml
+import opentrans.model.XmlContent
 
 /**
  * Minimal indenting XML writer for openTRANS documents.
@@ -59,11 +59,16 @@ internal class XmlOut {
         out.append('>').append(escape(value, attribute = false)).append("</").append(name).append(">\n")
     }
 
-    /** Element with xsd:anyType content, written unchanged. */
-    fun raw(name: String, value: RawXml?) {
+    /** Element with xsd:anyType content, written compactly; namespaces the content needs are declared in it. */
+    fun raw(name: String, value: XmlContent?) {
         if (value == null) return
         indent()
-        out.append('<').append(name).append('>').append(value.content).append("</").append(name).append(">\n")
+        out.append('<').append(name).append('>').append(value.toXml(ROOT_SCOPE)).append("</").append(name).append(">\n")
+    }
+
+    private companion object {
+        /** Prefixes declared on the root element, see [rootNamespaces]. */
+        val ROOT_SCOPE = mapOf("" to OT, "bmecat" to BMECAT)
     }
 
     private fun attributes(attributes: Array<out Pair<String, String?>>) {

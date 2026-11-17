@@ -109,7 +109,7 @@ class IrBuilder(private val model: XSModel) {
                     p.repeated -> addRepeatedGroup(cls, p, term, ::addProp)
                     else -> term.particleList.forEach { walk(it, forcedOptional || p.minOccurs == 0) }
                 }
-                is XSWildcard -> error("wildcard in ${cls.origin} should have been mapped to RawXml")
+                is XSWildcard -> error("wildcard in ${cls.origin} should have been mapped to XmlContent")
             }
         }
 
@@ -120,7 +120,7 @@ class IrBuilder(private val model: XSModel) {
             }
             XSComplexTypeDefinition.CONTENTTYPE_ELEMENT -> walk(t.particle, false)
             XSComplexTypeDefinition.CONTENTTYPE_EMPTY -> Unit
-            else -> error("mixed content in ${cls.origin} should have been mapped to RawXml")
+            else -> error("mixed content in ${cls.origin} should have been mapped to XmlContent")
         }
 
         for (use in t.attributeUseList) {

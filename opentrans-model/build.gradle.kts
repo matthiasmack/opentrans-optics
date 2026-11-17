@@ -1,7 +1,8 @@
 // Immutable data classes for openTRANS 2.1 documents.
 // Most of the model is generated from the XSD by :codegen at build time;
 // Arrow then generates the optics for every @optics class via KSP.
-// The model knows nothing about XML; reading and writing live in opentrans-xml.
+// Reading and writing documents live in opentrans-xml; the model only has the
+// XmlContent tree for free XML (UDX) and the UdxType API (package opentrans.udx).
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.ksp)

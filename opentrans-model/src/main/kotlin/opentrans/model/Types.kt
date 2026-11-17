@@ -44,10 +44,3 @@ value class DateTime(val value: String) {
         fun of(yearMonth: YearMonth) = DateTime(yearMonth.toString())
     }
 }
-
-/**
- * Content of an xsd:anyType element (HEADER_UDX, ITEM_UDX), kept as raw XML.
- * [content] is everything between the start and end tag, text and elements.
- */
-@JvmInline
-value class RawXml(val content: String)
