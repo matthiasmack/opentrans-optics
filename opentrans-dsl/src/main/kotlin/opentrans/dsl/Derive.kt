@@ -1,10 +1,10 @@
 package opentrans.dsl
 
-import opentrans.model.Dispatchnotification
+import opentrans.model.DispatchNotification
 import opentrans.model.Invoice
 import opentrans.model.Order
 import opentrans.model.OrderItem
-import opentrans.model.Orderresponse
+import opentrans.model.OrderResponse
 import opentrans.model.ShipmentPartiesReference
 import opentrans.model.TaxDetailsFix
 import java.math.BigDecimal
@@ -24,18 +24,18 @@ import java.math.RoundingMode
  *
  * ```
  * val response = order.toOrderResponse(date = LocalDate.now()) {
- *     orderresponseHeader { ... }   // optional overrides
+ *     orderResponseHeader { ... }   // optional overrides
  * }
  * ```
  */
-fun Order.toOrderResponse(date: Any, block: OrderresponseBuilder.() -> Unit = {}): Orderresponse {
+fun Order.toOrderResponse(date: Any, block: OrderResponseBuilder.() -> Unit = {}): OrderResponse {
     val info = orderHeader.orderInfo
     val items = orderItems
-    return Orderresponse {
-        orderresponseHeader {
-            orderresponseInfo {
+    return OrderResponse {
+        orderResponseHeader {
+            orderResponseInfo {
                 orderId = info.orderId
-                orderresponseDate(date)
+                orderResponseDate(date)
                 orderDate = info.orderDate
                 deliveryDate = info.deliveryDate
                 parties += info.parties
@@ -44,7 +44,7 @@ fun Order.toOrderResponse(date: Any, block: OrderresponseBuilder.() -> Unit = {}
             }
         }
         for (item in items) {
-            orderresponseItem {
+            orderResponseItem {
                 lineItemId = item.lineItemId
                 productId = item.productId
                 quantity = item.quantity
@@ -53,7 +53,7 @@ fun Order.toOrderResponse(date: Any, block: OrderresponseBuilder.() -> Unit = {}
                 priceLineAmount = item.priceLineAmount
             }
         }
-        orderresponseSummary {
+        orderResponseSummary {
             totalItemNum = items.size
             totalAmount = orderSummary.totalAmount
         }
@@ -72,8 +72,8 @@ fun Order.toDispatchNotification(
     id: String,
     date: Any,
     quantities: Map<String, Number> = emptyMap(),
-    block: DispatchnotificationBuilder.() -> Unit = {},
-): Dispatchnotification {
+    block: DispatchNotificationBuilder.() -> Unit = {},
+): DispatchNotification {
     val info = orderHeader.orderInfo
     val references = info.orderPartiesReference
     val shipment = references.shipmentPartiesReference ?: ShipmentPartiesReference(deliveryIdref = references.buyerIdref)
@@ -84,11 +84,11 @@ fun Order.toDispatchNotification(
     val unknown = quantities.keys - orderItems.map { it.lineItemId }.toSet()
     require(unknown.isEmpty()) { "Unknown line item ids: $unknown" }
 
-    return Dispatchnotification {
-        dispatchnotificationHeader {
-            dispatchnotificationInfo {
-                dispatchnotificationId = id
-                dispatchnotificationDate(date)
+    return DispatchNotification {
+        dispatchNotificationHeader {
+            dispatchNotificationInfo {
+                dispatchNotificationId = id
+                dispatchNotificationDate(date)
                 deliveryDate = info.deliveryDate
                 parties += info.parties
                 supplierIdref = references.supplierIdref
@@ -97,7 +97,7 @@ fun Order.toDispatchNotification(
             }
         }
         for ((item, quantity) in shipped) {
-            dispatchnotificationItem {
+            dispatchNotificationItem {
                 lineItemId = item.lineItemId
                 productId = item.productId
                 this.quantity = quantity
@@ -110,7 +110,7 @@ fun Order.toDispatchNotification(
                 shipmentPartiesReference = shipment
             }
         }
-        dispatchnotificationSummary(totalItemNum = shipped.size)
+        dispatchNotificationSummary(totalItemNum = shipped.size)
         block()
     }
 }

@@ -46,6 +46,7 @@ class IrBuilder(private val model: XSModel) {
             val binding = prop.binding as? Binding.Element ?: continue
             facetsByElement[binding.name]?.let { prop.facets = it }
         }
+        Names.unusedOverrides().takeIf { it.isNotEmpty() }?.let { error("overrides that match nothing: $it") }
         return Ir(classes, enums, choices, roots)
     }
 
@@ -57,7 +58,7 @@ class IrBuilder(private val model: XSModel) {
         reusableBase(t)?.let { return classForNamedType(it) }
 
         return classesByKey.getOrPut(e.qname) {
-            val name = typeNames.claim(Names.classOverrides[e.name] ?: elementBaseName(e))
+            val name = typeNames.claim(Names.classOverride(e.name) ?: elementBaseName(e))
             newClass(name, e.name, e.qname).also { cls -> pending += { fill(cls, t) } }
         }
     }
@@ -70,7 +71,7 @@ class IrBuilder(private val model: XSModel) {
 
     private fun classForNamedType(t: XSComplexTypeDefinition): ClassDef =
         classesByKey.getOrPut(QName(t.namespace, t.name)) {
-            val name = typeNames.claim(Names.classOverrides[t.name] ?: Names.className(t.name))
+            val name = typeNames.claim(Names.classOverride(t.name) ?: Names.className(t.name))
             newClass(name, t.name, null).also { cls -> pending += { fill(cls, t) } }
         }
 
@@ -95,7 +96,7 @@ class IrBuilder(private val model: XSModel) {
         var choiceCount = 0
 
         fun addProp(defaultName: String, type: KType, card: Card, binding: Binding) {
-            val name = Names.propertyOverrides["${cls.name}.$defaultName"] ?: Names.globalPropertyOverrides[defaultName] ?: defaultName
+            val name = Names.property(cls.name, defaultName)
             cls.props += Prop(props.claim(name), type, card, binding)
         }
 
@@ -175,7 +176,7 @@ class IrBuilder(private val model: XSModel) {
         addProp: (String, KType, Card, Binding) -> Unit,
     ) {
         val key = "${owner.origin}#$index"
-        val choice = ChoiceDef(typeNames.claim(Names.classOverrides[key] ?: (owner.name + "Choice")), key).also { choices += it }
+        val choice = ChoiceDef(typeNames.claim(Names.classOverride(key) ?: (owner.name + "Choice")), key).also { choices += it }
         val alternatives = group.particleList
         val directCandidates = alternatives.mapNotNull { (it.term as? XSElementDeclaration)?.takeIf { _ -> !it.repeated } }
             .map { elementType(it) }.filterIsInstance<KType.Class>().groupingBy { it.def }.eachCount()
@@ -187,8 +188,9 @@ class IrBuilder(private val model: XSModel) {
                 is XSElementDeclaration -> choice.variants += elementVariant(choice, alt, term, directCandidates)
                 is XSModelGroup -> {
                     val first = term.firstElement() ?: error("empty sequence in choice $key")
-                    val name = typeNames.claim(owner.name + Names.className(first.name) + "Group")
-                    val cls = newClass(name, "$key/${first.name}...", null)
+                    val origin = "$key/${first.name}..."
+                    val name = typeNames.claim(Names.classOverride(origin) ?: (owner.name + Names.className(first.name) + "Group"))
+                    val cls = newClass(name, origin, null)
                     cls.implements += choice
                     pending += { fillFromGroup(cls, term) }
                     choice.variants += Variant(cls, VariantKind.Sequence)
@@ -213,7 +215,7 @@ class IrBuilder(private val model: XSModel) {
             val cls = repeatedVariantsByElement.getOrPut(e.qname) {
                 val singular = Names.className(e.name)
                 val plural = Names.plural(singular).let { if (it == singular) "${singular}List" else it }
-                newClass(typeNames.claim(plural), "${e.name}+", null).also {
+                newClass(typeNames.claim(Names.classOverride("${e.name}+") ?: plural), "${e.name}+", null).also {
                     it.props += Prop(Names.plural(Names.propertyName(e.name)), type, Card.Many(maxOf(alt.minOccurs, 1)), Binding.Element(e.qname))
                 }
             }
@@ -237,7 +239,7 @@ class IrBuilder(private val model: XSModel) {
         val props = NameRegistry()
         for (p in group.particleList) {
             val e = p.term as? XSElementDeclaration ?: error("nested group inside ${cls.origin} is not supported")
-            addElement(p, e, false) { name, type, card, binding -> cls.props += Prop(props.claim(Names.globalPropertyOverrides[name] ?: name), type, card, binding) }
+            addElement(p, e, false) { name, type, card, binding -> cls.props += Prop(props.claim(Names.property(cls.name, name)), type, card, binding) }
         }
     }
 
@@ -303,7 +305,7 @@ class IrBuilder(private val model: XSModel) {
         val values = (0 until t.lexicalEnumeration.length).map { t.lexicalEnumeration.item(it) }
         if (values.size in 1..60) {
             return KType.Enum(enumsByType.getOrPut(t) {
-                EnumDef(typeNames.claim(Names.classOverrides[origin] ?: enumName), origin, values).also { enums += it }
+                EnumDef(typeNames.claim(Names.classOverride(origin) ?: enumName), origin, values).also { enums += it }
             })
         }
         if (names.any { it == (BMECAT_NS to "dtDATETIME") }) return KType.Scalar(ScalarKind.DATETIME)

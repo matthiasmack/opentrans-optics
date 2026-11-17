@@ -1,8 +1,8 @@
 package opentrans.dsl
 
-import opentrans.model.Dispatchnotification
+import opentrans.model.DispatchNotification
 import opentrans.model.Invoice
-import opentrans.model.Orderresponse
+import opentrans.model.OrderResponse
 import opentrans.model.spikeOrder
 import opentrans.xml.OpenTransXml
 import java.math.BigDecimal
@@ -20,41 +20,41 @@ class DeriveTest {
     @Test
     fun `order response confirms the order`() {
         val response = roundTrip(spikeOrder.toOrderResponse(date = LocalDate.of(2026, 11, 18)))
-        val info = response.orderresponseHeader.orderresponseInfo
+        val info = response.orderResponseHeader.orderResponseInfo
 
         assertEquals("PO-1001", info.orderId)
-        assertEquals("2026-11-18", info.orderresponseDate.value)
+        assertEquals("2026-11-18", info.orderResponseDate.value)
         assertEquals(spikeOrder.orderHeader.orderInfo.parties, info.parties)
-        assertEquals(spikeOrder.orderItems.map { it.quantity }, response.orderresponseItems.map { it.quantity })
-        assertEquals(BigDecimal("46.00"), response.orderresponseSummary.totalAmount)
+        assertEquals(spikeOrder.orderItems.map { it.quantity }, response.orderResponseItems.map { it.quantity })
+        assertEquals(BigDecimal("46.00"), response.orderResponseSummary.totalAmount)
     }
 
     @Test
     fun `order response can be adjusted in the block`() {
         val response = spikeOrder.toOrderResponse(date = "2026-11-18") {
-            orderresponseItems[1] = orderresponseItems[1].copy(quantity = BigDecimal("2"))
+            orderResponseItems[1] = orderResponseItems[1].copy(quantity = BigDecimal("2"))
         }
-        assertEquals(BigDecimal("2"), roundTrip(response).orderresponseItems[1].quantity)
+        assertEquals(BigDecimal("2"), roundTrip(response).orderResponseItems[1].quantity)
     }
 
     @Test
     fun `dispatch notification ships everything by default`() {
         val dispatch = roundTrip(spikeOrder.toDispatchNotification(id = "DN-1", date = "2026-11-24"))
-        val items = dispatch.dispatchnotificationItems
+        val items = dispatch.dispatchNotificationItems
 
         assertEquals(listOf("1", "2"), items.map { it.orderReference.lineItemId })
         assertEquals(listOf("PO-1001", "PO-1001"), items.map { it.orderReference.orderId })
         // No delivery party in the order: the buyer receives the goods.
-        assertEquals("BUYER-1", dispatch.dispatchnotificationHeader.dispatchnotificationInfo.shipmentPartiesReference.deliveryIdref.value)
+        assertEquals("BUYER-1", dispatch.dispatchNotificationHeader.dispatchNotificationInfo.shipmentPartiesReference.deliveryIdref.value)
     }
 
     @Test
     fun `dispatch notification for a partial delivery`() {
         val dispatch = roundTrip(spikeOrder.toDispatchNotification(id = "DN-2", date = "2026-11-24", quantities = mapOf("1" to 40, "2" to 0)))
 
-        assertEquals(listOf("1"), dispatch.dispatchnotificationItems.map { it.lineItemId })
-        assertEquals(BigDecimal.valueOf(40), dispatch.dispatchnotificationItems.single().quantity)
-        assertEquals(1, dispatch.dispatchnotificationSummary.totalItemNum)
+        assertEquals(listOf("1"), dispatch.dispatchNotificationItems.map { it.lineItemId })
+        assertEquals(BigDecimal.valueOf(40), dispatch.dispatchNotificationItems.single().quantity)
+        assertEquals(1, dispatch.dispatchNotificationSummary.totalItemNum)
         assertFailsWith<IllegalArgumentException> { spikeOrder.toDispatchNotification("DN-3", "2026-11-24", mapOf("99" to 1)) }
     }
 
@@ -85,7 +85,7 @@ class DeriveTest {
     @Test
     fun `all three follow-up documents are different document types`() {
         assertEquals(
-            listOf(Orderresponse::class, Dispatchnotification::class, Invoice::class),
+            listOf(OrderResponse::class, DispatchNotification::class, Invoice::class),
             listOf(spikeOrder.toOrderResponse("2026-11-18"), spikeOrder.toDispatchNotification("DN", "2026-11-24"), spikeOrder.toInvoice("I", "2026-11-30", "0.19")).map { it::class },
         )
     }

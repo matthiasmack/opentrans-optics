@@ -1,9 +1,9 @@
 package opentrans.xml
 
 import opentrans.model.Card
-import opentrans.model.Dispatchnotification
+import opentrans.model.DispatchNotification
 import opentrans.model.Invoice
-import opentrans.model.Invoicelist
+import opentrans.model.InvoiceList
 import opentrans.model.OpenTransDocument
 import opentrans.model.Order
 import opentrans.model.OrderType
@@ -42,13 +42,13 @@ class DocumentReadTest {
 
     @Test
     fun `official DISPATCHNOTIFICATION sample is read`() {
-        val dispatch = assertIs<Dispatchnotification>(read("dispatchnotification.xml"))
-        assert(dispatch.dispatchnotificationItems.isNotEmpty())
+        val dispatch = assertIs<DispatchNotification>(read("dispatchnotification.xml"))
+        assert(dispatch.dispatchNotificationItems.isNotEmpty())
     }
 
     @Test
     fun `official INVOICELIST sample is read`() {
-        assertIs<Invoicelist>(read("invoicelist.xml"))
+        assertIs<InvoiceList>(read("invoicelist.xml"))
     }
 
     @Test

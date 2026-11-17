@@ -200,6 +200,10 @@ already resolved.
   function per class following the xsd:sequence order.
 - **Override table** in the generator for names the rules get wrong
   (plurals, choice names, a few property names). Small and explicit.
+  An override that matches nothing fails the generator.
+- **Compound words.** XSD names that run words together are split for
+  Kotlin names only: `DISPATCHNOTIFICATION` -> `DispatchNotification`,
+  `DESCR` -> `Description`. XML names are unaffected.
 
 ### Generator steps
 
@@ -213,9 +217,7 @@ G2. Generate the model for all ten document types; compiles with Arrow KSP. ✔
       value (`version="2.1"`) is treated as fixed and not modelled.
     - Repeated choice alternatives are one class per element, shared by all
       choices that use it (e.g. `Territories`).
-    - Open naming work for the override table: numbered names where the rules
-      have no good default (`FeatureChoice2`, `ProductPriceChoice2/3`,
-      `Ftemplate2`), and a few clumsy plurals (`*Descrs`).
+    - Naming work for the override table: done in G8.
 G3. Generate the reader. ✔
     - `./gradlew :opentrans-xml:generateReader` emits one `XmlIn.readX()` per
       class (about 5,400 lines) from the same IR as the model, plus
@@ -289,6 +291,25 @@ G7. Facet checks generated into the model. ✔
     - All samples and derived documents still pass, so the checks produce no
       false alarms on valid data. The XSD validation on write remains the
       second net (e.g. for malformed UDX content).
+G8. Names cleaned up before the first release. ✔
+    - Compound words split: `DispatchNotification`, `OrderResponse`,
+      `OrderChange`, `InvoiceList`, `ReceiptAcknowledgement`,
+      `RemittanceAdvice` (and their Header/Info/Item/Summary), `startValue`,
+      `ftShortNames`, `*Descriptions` instead of `*Descrs`, ...
+    - No numbered names left. Choices that had numbers or a vague name are
+      now named after what they hold: `Feature.name` / `.value`
+      (`FeatureName`, `FeatureValue`), `ProductPrice.value` / `.tax` /
+      `.territory`, `CustomsTariffNumber.territory`, `OrderItem.delivery`
+      (`SingleDelivery` | `PartialDeliveryList`, likewise for ORDERRESPONSE
+      and QUOTATION items), `BmecatProductPriceDetails.validity`
+      (`ValidityPeriod` | `Datetimes`), `Mime.content` (`MimeSources` |
+      `MimeEmbeddedList`). typeFTEMPLATE is `FeatureTemplate`; the FTEMPLATE
+      choice wrapper keeps the element name `Ftemplate`.
+    - Feature drops BMEcat's F prefix: `unit`, `order`, `descriptions`,
+      `valueDetails`, `valueType`.
+    - Plurals with a trailing digit: `names2`, `referenceFeatureGroupIds2`.
+    - The remaining `<Parent>Choice` names (`SignatureChoice`,
+      `FtValueChoice`, ...) follow the default rule and are left as they are.
 
 ## After the generator
 
