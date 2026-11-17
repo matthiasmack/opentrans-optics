@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Spike sample: an ORDER that uses exactly the subset modelled in opentrans-model,
+  but covers every schema pattern of that subset at least once.
+  All values are neutral placeholders.
+-->
+<ORDER xmlns="http://www.opentrans.org/XMLSchema/2.1" xmlns:bmecat="http://www.bmecat.org/bmecat/2005" version="2.1" type="express">
+	<ORDER_HEADER>
+		<CONTROL_INFO>
+			<GENERATION_DATE>2026-11-17T09:30:00+01:00</GENERATION_DATE>
+		</CONTROL_INFO>
+		<ORDER_INFO>
+			<ORDER_ID>PO-1001</ORDER_ID>
+			<ORDER_DATE>2026-11-17</ORDER_DATE>
+			<DELIVERY_DATE type="optional">
+				<DELIVERY_START_DATE>2026-11-24</DELIVERY_START_DATE>
+				<DELIVERY_END_DATE>2026-11-28</DELIVERY_END_DATE>
+			</DELIVERY_DATE>
+			<PARTIES>
+				<PARTY>
+					<bmecat:PARTY_ID type="buyer_specific">BUYER-1</bmecat:PARTY_ID>
+					<bmecat:PARTY_ID type="gln">4000000000001</bmecat:PARTY_ID>
+					<PARTY_ROLE>buyer</PARTY_ROLE>
+					<PARTY_ROLE>invoice_recipient</PARTY_ROLE>
+					<ADDRESS>
+						<bmecat:NAME lang="deu">Beispiel GmbH</bmecat:NAME>
+						<bmecat:NAME lang="eng">Example Ltd</bmecat:NAME>
+						<bmecat:STREET>Musterweg 1</bmecat:STREET>
+						<bmecat:ZIP>10000</bmecat:ZIP>
+						<bmecat:CITY>Musterstadt</bmecat:CITY>
+						<bmecat:COUNTRY_CODED>DE</bmecat:COUNTRY_CODED>
+						<bmecat:VAT_ID>DE000000000</bmecat:VAT_ID>
+					</ADDRESS>
+					<ACCOUNT>
+						<HOLDER>Example Ltd</HOLDER>
+						<BANK_ACCOUNT type="iban">DE00000000000000000000</BANK_ACCOUNT>
+						<BANK_CODE type="bic">XXXXDEXXXXX</BANK_CODE>
+						<BANK_NAME>Example Bank</BANK_NAME>
+						<BANK_COUNTRY>DE</BANK_COUNTRY>
+					</ACCOUNT>
+				</PARTY>
+				<PARTY>
+					<bmecat:PARTY_ID type="supplier_specific">SUPPLIER-1</bmecat:PARTY_ID>
+					<PARTY_ROLE>supplier</PARTY_ROLE>
+				</PARTY>
+			</PARTIES>
+			<ORDER_PARTIES_REFERENCE>
+				<bmecat:BUYER_IDREF type="buyer_specific">BUYER-1</bmecat:BUYER_IDREF>
+				<bmecat:SUPPLIER_IDREF type="supplier_specific">SUPPLIER-1</bmecat:SUPPLIER_IDREF>
+			</ORDER_PARTIES_REFERENCE>
+			<bmecat:CURRENCY>EUR</bmecat:CURRENCY>
+			<PAYMENT>
+				<CARD type="VISA">
+					<CARD_NUM>4111111111111111</CARD_NUM>
+					<CARD_EXPIRATION_DATE>2028-05</CARD_EXPIRATION_DATE>
+					<CARD_HOLDER_NAME>card-holder</CARD_HOLDER_NAME>
+				</CARD>
+				<CENTRAL_REGULATION>FALSE</CENTRAL_REGULATION>
+				<PAYMENT_TERMS>
+					<TIME_FOR_PAYMENT>
+						<DAYS>10</DAYS>
+						<DISCOUNT_FACTOR>0.02</DISCOUNT_FACTOR>
+					</TIME_FOR_PAYMENT>
+					<TIME_FOR_PAYMENT>
+						<PAYMENT_DATE>2026-12-31</PAYMENT_DATE>
+					</TIME_FOR_PAYMENT>
+				</PAYMENT_TERMS>
+			</PAYMENT>
+			<TERMS_AND_CONDITIONS>general terms</TERMS_AND_CONDITIONS>
+			<PARTIAL_SHIPMENT_ALLOWED>true</PARTIAL_SHIPMENT_ALLOWED>
+			<REMARKS type="general" lang="deu">Bitte an Tor 2 liefern.</REMARKS>
+			<REMARKS type="transport">fragile</REMARKS>
+			<HEADER_UDX>
+				<UDX.CUSTOM xmlns="urn:example:udx">
+					<PROJECT>project-7</PROJECT>
+					<PRIORITY level="high"/>
+				</UDX.CUSTOM>
+			</HEADER_UDX>
+		</ORDER_INFO>
+	</ORDER_HEADER>
+	<ORDER_ITEM_LIST>
+		<ORDER_ITEM>
+			<LINE_ITEM_ID>1</LINE_ITEM_ID>
+			<PRODUCT_ID>
+				<bmecat:SUPPLIER_PID type="supplier_specific">SKU-A</bmecat:SUPPLIER_PID>
+				<bmecat:BUYER_PID type="buyer_specific">MAT-100</bmecat:BUYER_PID>
+				<bmecat:DESCRIPTION_SHORT lang="deu">Schraube M4</bmecat:DESCRIPTION_SHORT>
+				<bmecat:DESCRIPTION_SHORT lang="eng">Screw M4</bmecat:DESCRIPTION_SHORT>
+				<bmecat:DESCRIPTION_LONG lang="eng">Stainless steel screw, M4 x 20</bmecat:DESCRIPTION_LONG>
+			</PRODUCT_ID>
+			<QUANTITY>100</QUANTITY>
+			<bmecat:ORDER_UNIT>C62</bmecat:ORDER_UNIT>
+			<PRODUCT_PRICE_FIX>
+				<bmecat:PRICE_AMOUNT>0.15</bmecat:PRICE_AMOUNT>
+				<bmecat:PRICE_QUANTITY>1</bmecat:PRICE_QUANTITY>
+			</PRODUCT_PRICE_FIX>
+			<PRICE_LINE_AMOUNT>15.00</PRICE_LINE_AMOUNT>
+			<ITEM_UDX>
+				<UDX.CUSTOM xmlns="urn:example:udx">
+					<COST_CENTER>cc-42</COST_CENTER>
+				</UDX.CUSTOM>
+			</ITEM_UDX>
+		</ORDER_ITEM>
+		<ORDER_ITEM>
+			<LINE_ITEM_ID>2</LINE_ITEM_ID>
+			<PRODUCT_ID>
+				<bmecat:SUPPLIER_PID>SKU-B</bmecat:SUPPLIER_PID>
+				<bmecat:DESCRIPTION_SHORT>Mutter M4</bmecat:DESCRIPTION_SHORT>
+			</PRODUCT_ID>
+			<QUANTITY>2.5</QUANTITY>
+			<bmecat:ORDER_UNIT>KGM</bmecat:ORDER_UNIT>
+			<PRODUCT_PRICE_FIX>
+				<bmecat:PRICE_AMOUNT>12.40</bmecat:PRICE_AMOUNT>
+			</PRODUCT_PRICE_FIX>
+			<PRICE_LINE_AMOUNT>31.00</PRICE_LINE_AMOUNT>
+			<REMARKS type="order">deliver separately</REMARKS>
+		</ORDER_ITEM>
+	</ORDER_ITEM_LIST>
+	<ORDER_SUMMARY>
+		<TOTAL_ITEM_NUM>2</TOTAL_ITEM_NUM>
+		<TOTAL_AMOUNT>46.00</TOTAL_AMOUNT>
+	</ORDER_SUMMARY>
+</ORDER>
