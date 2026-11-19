@@ -1,16 +1,17 @@
 # CLAUDE.md
 
 Kotlin library for openTRANS 2.1 documents (read, edit with Arrow optics, create with a DSL, write).
-Users and features: see README.md. Decisions, schema findings, generator rules and progress:
-see PLAN.md. **Read PLAN.md before larger changes and update it when a step is done**, adding a
-`G<n>` entry under "Generator steps" in the same style as the existing ones.
+README.md presents the library: features, usage and the section "Design decisions". **Keep that
+section current**: a new or changed design decision goes there, in general terms (what and why),
+not as a changelog. The XSD -> Kotlin mapping rules are documented on `IrBuilder`. History lives
+in git.
 
 ## Commands
 
 - `./gradlew build`: generates the code, compiles and runs all tests. Run it before saying a
   change works.
-- `./gradlew :opentrans-model:generateModel` (also `:opentrans-xml:generateXml`,
-  `:opentrans-dsl:generateDsl`): regenerates one module's code. The output goes to
+- `./gradlew :opentrans-optics-model:generateModel` (also `:opentrans-optics-xml:generateXml`,
+  `:opentrans-optics-dsl:generateDsl`): regenerates one module's code. The output goes to
   `<module>/build/generated/opentrans/kotlin`.
 - `./gradlew :codegen:inventory`: prints which XSD constructs are reachable (analysis only).
 - Gradle is often fast because of the build cache. When a result looks suspicious, check
@@ -24,16 +25,17 @@ JDK 25, Kotlin, Gradle wrapper, versions in `gradle/libs.versions.toml`.
   - `IrBuilder` turns the XSD into a format-neutral IR (`Ir.kt`). `ModelEmitter`, `ReaderEmitter`,
     `WriterEmitter` and `DslEmitter` emit code from the IR.
   - `Names.kt` holds all naming rules and the override tables.
-- `opentrans-model/`: the generated model in package `opentrans.model`. Hand-written there:
-  `Types.kt` (`DateTime`), `Facets.kt`, `XmlContent.kt` (free XML tree), and `opentrans/udx/`
-  (UdxType API).
-- `opentrans-xml/`: the generated reader and writer (internal). Hand-written: `XmlIn`, `XmlOut`,
+- All Kotlin code lives under the package `io.github.matthiasmack.opentrans` (directories
+  `io/github/matthiasmack/opentrans/...`). Below, packages are named relative to it.
+- `opentrans-optics-model/`: the generated model in `.model`. Hand-written there: `Types.kt`
+  (`DateTime`), `Facets.kt`, `XmlContent.kt` (free XML tree), and `.udx` (UdxType API).
+- `opentrans-optics-xml/`: the generated reader and writer (internal). Hand-written: `XmlIn`, `XmlOut`,
   `OpenTransSchema` (validation, hardening) and `OpenTransXml` (public API). The XSDs are in
-  `src/main/resources/opentrans/xsd/2.1`.
-- `opentrans-dsl/`: the generated builders. Hand-written: `Common.kt`, `OrderDsl.kt`,
+  `src/main/resources/io/github/matthiasmack/opentrans/xsd/2.1`.
+- `opentrans-optics-dsl/`: the generated builders. Hand-written: `Common.kt`, `OrderDsl.kt`,
   `PaymentDsl.kt`, `Derive.kt`.
-- Test data: `opentrans-xml/src/test/resources/samples` (official samples + `order-spike.xml`).
-  Shared fixtures are in `opentrans-model/src/testFixtures`: `spikeOrder` and example UDX types.
+- Test data: `opentrans-optics-xml/src/test/resources/samples` (official samples + `order-spike.xml`).
+  Shared fixtures are in `opentrans-optics-model/src/testFixtures`: `spikeOrder` and example UDX types.
 
 ## Rules
 
@@ -49,17 +51,25 @@ JDK 25, Kotlin, Gradle wrapper, versions in `gradle/libs.versions.toml`.
 - **UDX is a user extension point.** The library ships no UDX dialect. Example types live only in
   test fixtures. Every UDX feature must work for third-party types nobody here knows.
 - Prefer explicit code over reflection, annotations or compiler plugins (except Arrow's KSP).
+- **Exceptions:** a problem with a document or its data throws a subclass of `OpenTransException`
+  (`model/Exceptions.kt`). A missing required value is an `IncompleteDocumentException` with the
+  XML path in `element`. Wrong use of the API (a block given twice, a contradictory `UdxType`)
+  stays a plain `IllegalStateException` / `IllegalArgumentException`. Don't add new exception
+  types without a reason the README's error table can explain.
 - Hand-written names must not collide case-insensitively with generated ones: macOS treats
   `Datetime.class` and `DateTime.class` as the same file. Reserve new hand-written model types in
   `Names.reserved`.
 - New behaviour gets tests. Prefer the official samples and `spikeOrder`, and assert exact error
   messages where they are part of the API (facet and UDX violations).
-- Code, comments, KDoc, README and PLAN.md are written in English.
+- Code, comments, KDoc and README are written in English.
 
 ## Gotchas
 
 - StAX: read attributes before the element text. Reading the text moves the cursor off the
   start tag.
 - XSD `\w` / `\d` are Unicode-aware, Java's are ASCII-only. Patterns go through `XsdRegex`.
+- The official samples `invoice.xml` and `dispatchnotification.xml` declare ISO-8859-1 but contain
+  UTF-8 bytes. Read as bytes, they decode (correctly, per the declaration) to "GÃ¼nther". Tests
+  read the samples as UTF-8 strings. Don't "fix" the library to guess encodings.
 - The bundled XSDs keep their copyright headers unchanged (openTRANS: Fraunhofer IAO / BLI,
   BMEcat: BME e.V., xmldsig/xmlmime: W3C). Never modify them.

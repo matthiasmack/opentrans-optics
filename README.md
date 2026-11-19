@@ -1,84 +1,34 @@
 # opentrans-optics
 
-A Kotlin library to read, edit, create and write [openTRANS®](https://www.opentrans.org) 2.1
-documents: ORDER, ORDERRESPONSE, ORDERCHANGE, DISPATCHNOTIFICATION, RECEIPTACKNOWLEDGEMENT,
-INVOICE, INVOICELIST, REMITTANCEADVICE, RFQ and QUOTATION.
+**openTRANS® 2.1 for Kotlin: type-safe and immutable, valid by construction.**
+Read, change, create and write business documents without null-check chains, index loops or
+invalid XML reaching your partners.
 
-Documents are immutable Kotlin data classes generated from the official XSD. You edit them with
-[Arrow optics](https://arrow-kt.io/learn/immutable-data/intro/) and create them with a Kotlin DSL.
-XML is validated against the XSD on the way in and on the way out.
+All ten [openTRANS®](https://www.opentrans.org) 2.1 document types are covered: ORDER,
+ORDERRESPONSE, ORDERCHANGE, DISPATCHNOTIFICATION, RECEIPTACKNOWLEDGEMENT, INVOICE, INVOICELIST,
+REMITTANCEADVICE, RFQ and QUOTATION. They are immutable Kotlin data classes generated from the
+official XSD. You edit them with [Arrow optics](https://arrow-kt.io/learn/immutable-data/intro/)
+and create them with a Kotlin DSL.
 
 > **Status: early and unpublished.** Version `0.1.0-SNAPSHOT`. The API may still change, and
 > nothing is on Maven Central yet. For now you build it from source (see [Building](#building)).
 
-## Features
+## What you get
 
-- **All ten document types**, generated from the openTRANS 2.1 / BMEcat 2005 XSD: 191 classes,
-  26 enums and 20 sealed choices.
-- **Strict in both directions.** Input is validated against the XSD before it is mapped. Output is
-  validated before it is returned. XSD facets (lengths, patterns, code lists, ranges) are also
-  checked when an object is created, so an invalid value fails where it is made, with the XML path
-  in the message.
-- **Optics for every class.** Deep, immutable updates such as "all item prices of an order" in
-  one line.
-- **Builder DSL** for every class, plus a short `order(id, date) { }` DSL that derives
-  references, line ids and totals.
-- **Follow-up documents** derived from an ORDER: ORDERRESPONSE, DISPATCHNOTIFICATION (full or
-  partial) and INVOICE.
-- **Typed UDX.** You define your own user-defined extensions in Kotlin. No XSD is needed, and UDX
-  you have not defined is kept and written back unchanged.
-- **Hardened XML parsing:** no DTDs, no external entities, no entity expansion.
+### Documents you build with the compiler on your side
 
-## Modules
-
-| Module            | Contents                                                                    |
-|-------------------|-----------------------------------------------------------------------------|
-| `opentrans-model` | data classes, Arrow optics, facet checks, `XmlContent`, the UDX API         |
-| `opentrans-xml`   | `OpenTransXml`: read, write and validate; bundled XSDs                       |
-| `opentrans-dsl`   | generated builders, `order { }`, deriving follow-up documents               |
-| `codegen`         | XSD → Kotlin generator, runs at build time and is not a runtime dependency  |
-
-`opentrans-xml` and `opentrans-dsl` both depend on `opentrans-model`.
-
-## Usage
-
-### Read and write
+Write an order the way you think about it. The DSL knows every element of the standard, your IDE
+completes every block, and the result is valid openTRANS:
 
 ```kotlin
-val document = OpenTransXml.read(xml)              // any of the ten types, also inside <OPENTRANS>
-when (document) {
-    is Order -> println(document.orderHeader.orderInfo.orderId)
-    is Invoice -> ...
-    else -> ...
-}
-
-val order: Order = OpenTransXml.readAs(Path.of("order.xml"))   // fails on another document type
-val out: String = OpenTransXml.write(order)                    // validated before it is returned
-```
-
-Invalid input or output throws `OpenTransValidationException`, which carries the XSD errors.
-
-### Edit with optics
-
-Every class has a `companion object` with generated optics:
-
-```kotlin
-val prices = Order.orderItems.every.productPriceFix.notNull.priceAmount
-val discounted = prices.modify(order) { it * BigDecimal("0.9") }
-
-val renumbered = Order.orderHeader.orderInfo.orderId.set(order, "PO-2001")
-```
-
-### Create with the DSL
-
-```kotlin
-val order = order(id = "PO-1001", date = LocalDate.of(2026, 11, 17)) {
+val order = order(id = "PO-1001", date = LocalDate.now()) {
     buyer {
         id("BUYER-1", "buyer_specific")
         address { name("Example Ltd"); city("Musterstadt"); country = "DE" }
     }
     supplier { id("SUPPLIER-1", "supplier_specific") }
     currency = "EUR"
+    payment { debit() }
 
     item(quantity = 100, unit = "C62") {
         supplierPid("SKU-A")
@@ -88,11 +38,197 @@ val order = order(id = "PO-1001", date = LocalDate.of(2026, 11, 17)) {
 }
 ```
 
-Line item ids, party references and amounts are derived. Every generated class also has a full
-builder, e.g. `OrderItem { lineItemId = "1"; productId { supplierPid("SKU-1") }; ... }`. A missing
-required value fails in `build()` with the XML element name.
+Party references, roles, line item ids, line amounts and order totals are filled in for you. Plain
+values just work: `LocalDate`, `"2026-11-17"`, `100`, `2.5` or `"0.15"`. Need the full depth of the
+standard? Every one of the 191 classes has its own generated builder, from `Order { }` down to
+`ProductPriceFix { }`. A forgotten required value tells you exactly which XML element is missing.
 
-### Derive follow-up documents
+### Change anything, anywhere, in one line
+
+An optic is a path into a document, such as "the price of every item". You write the path once
+and can then read, replace or transform whatever it points to. Without optics, changing one value
+deep inside an immutable document means copying every level above it by hand. With an optic it
+is a single call, and lists, optional elements and choices along the way are handled for you.
+Every class here comes with optics generated by [Arrow](https://arrow-kt.io/learn/immutable-data/intro/),
+a well-established functional programming library for Kotlin. Its documentation explains optics
+in depth.
+
+```kotlin
+val order: Order = OpenTransXml.readAs(xml)
+
+// 10 % off every item price: one expression, a new document, the original stays untouched
+val discounted = Order.orderItems.every.productPriceFix.notNull.priceAmount
+    .modify(order) { it * BigDecimal("0.9") }
+
+// derive the invoice and write it, validated against the official XSD
+val invoice = discounted.toInvoice(id = "INV-1", date = LocalDate.now(), vatRate = "0.19")
+val out = OpenTransXml.write(invoice)
+```
+
+Derive the follow-up documents straight from an order: ORDERRESPONSE, DISPATCHNOTIFICATION (full
+or partial, per line item) and INVOICE with tax computed and rounded. Each one is valid openTRANS
+and ready to send.
+
+A path into a document is a value. Name it once, then read, set or transform through it:
+
+```kotlin
+val itemPrices = Order.orderItems.every.productPriceFix.notNull.priceAmount
+
+val prices: List<BigDecimal> = itemPrices.getAll(order)                    // every price in the order
+val renumbered: Order = Order.orderHeader.orderInfo.orderId.set(order, "PO-2001")  // a new order with one field changed
+```
+
+Documents are immutable, so every change gives you a new document and the original stays as it
+was. Share them across threads, cache them, compare before and after. Nothing changes behind
+your back.
+
+### Valid by construction
+
+Every rule of the XSD is enforced: lengths, patterns, code lists, number ranges, required
+elements. An invalid value fails the moment it is created, and the message tells you where:
+
+```
+ORDER_INFO/ORDER_ID: at most 250 characters, got 251
+```
+
+On top of that, every document is validated against the official schema when it is read and
+again before it is written. Invalid XML never enters your system and never leaves it.
+
+### Types that tell the truth
+
+Required elements are non-null, optional ones are nullable, lists are never null. When the
+standard says "exactly one of", you get a sealed type, and the compiler makes sure you handle
+every case:
+
+```kotlin
+when (val method = order.orderHeader.orderInfo.payment?.method) {
+    is Card -> charge(method.cardNum)
+    is Accounts -> transfer(method.accounts)
+    is Debit, is Check, is Cash, null -> manual()
+}
+```
+
+### Your own extensions, first class
+
+`HEADER_UDX` and `ITEM_UDX` are where every company keeps the fields the standard does not have:
+project numbers, cost centers, packaging instructions, approval flags. Usually that means a blob
+of XML with no schema, dug through by hand. Here your extensions become part of your model, just
+like the rest of the document.
+
+Describe a UDX once, in plain Kotlin. No XSD, no annotations:
+
+```kotlin
+data class CostCenter(val id: String, val budget: BigDecimal?)
+
+object CostCenterUdx : UdxType<CostCenter>("UDX.ACME.COSTCENTER", "urn:acme:udx") {
+    private val id     = required("ID", CostCenter::id, string(pattern = Regex("CC-\\d{4}")))
+    private val budget = optional("BUDGET", CostCenter::budget, decimal(min = BigDecimal.ZERO))
+    override fun create(v: Values) = CostCenter(v[id], v[budget])
+}
+```
+
+That one description is all it takes:
+
+```kotlin
+// read: typed and null-safe
+val costCenter: CostCenter? = order.orderItems.first().itemUdx?.get(CostCenterUdx)
+
+// change: with optics, here across every item at once
+val costCenters = Order.orderItems.every.itemUdx.udx(CostCenterUdx)
+val moved = costCenters.modify(order) { it.copy(id = "CC-2000") }
+
+// create: right inside the DSL
+order(id = "PO-1002", date = LocalDate.now()) {
+    // buyer, supplier, ...
+    item(quantity = 1, unit = "C62") {
+        supplierPid("SKU-A")
+        description("Screw M4")
+        udx { add(CostCenterUdx, CostCenter("CC-1000", BigDecimal("5000"))) }
+    }
+}
+```
+
+- **Validated in both directions.** A wrong value is rejected when it is read and when it is
+  written, and the message gives the path: `UDX.ACME.COSTCENTER/ID: 'X-1' does not match CC-\d{4}`.
+  Unknown elements, missing required values and too many repetitions are caught the same way.
+- **Expressive enough for real-world UDX.** Required, optional and repeated elements, attributes,
+  nested structures, strings with length and pattern, numbers with ranges, booleans, dates, enums,
+  or value types of your own.
+- **Side by side with everyone else's.** One UDX block can hold extensions from several parties.
+  Each type reads and writes only its own element, and everything else travels through untouched.
+  Documents from partners you have no description for still go in and out unchanged.
+- **Your extension, finally specified.** The Kotlin description is an exact, versioned definition
+  of what your UDX contains, right next to the code that uses it.
+
+## Modules
+
+| Module                   | Contents                                                                              |
+|--------------------------|---------------------------------------------------------------------------------------|
+| `opentrans-optics-model` | data classes, Arrow optics, XSD rules checked on creation, `XmlContent`, the UDX API |
+| `opentrans-optics-xml`   | `OpenTransXml`: read, write and validate; bundled XSDs                                |
+| `opentrans-optics-dsl`   | generated builders, `order { }`, deriving follow-up documents                        |
+| `codegen`                | XSD → Kotlin generator, runs at build time and is not a runtime dependency           |
+
+`opentrans-optics-xml` and `opentrans-optics-dsl` both depend on `opentrans-optics-model`.
+
+## Usage
+
+### Add it to your project
+
+Nothing is published yet, so include the library as a Gradle composite build. Check it out next
+to your project, then:
+
+```kotlin
+// settings.gradle.kts
+includeBuild("../opentrans-optics")
+
+// build.gradle.kts
+dependencies {
+    implementation("io.github.matthiasmack:opentrans-optics-xml:0.1.0-SNAPSHOT")   // read, write, validate
+    implementation("io.github.matthiasmack:opentrans-optics-dsl:0.1.0-SNAPSHOT")   // create and derive documents
+}
+```
+
+Both bring `opentrans-optics-model` with them. The code lives in the packages
+`io.github.matthiasmack.opentrans.model` (documents and optics), `.xml` (`OpenTransXml`), `.dsl`
+(builders and derived documents) and `.udx` (typed UDX). The library is compiled for Java 25, so your project
+needs JDK 25 as well.
+
+### Receive a document
+
+`OpenTransXml.read` accepts whatever your interface delivers: a `String`, a `ByteArray`, an
+`InputStream`, a `Reader` or a file `Path`. It returns one of the ten document types, also when
+the document is wrapped in `<OPENTRANS>`.
+
+```kotlin
+fun receive(body: InputStream) {                  // HTTP request, message queue, upload, ...
+    when (val document = OpenTransXml.read(body)) {
+        is Order -> importOrder(document)
+        is OrderChange -> applyChange(document)
+        else -> reject("unexpected ${document::class.simpleName}")
+    }
+}
+
+fun importOrder(order: Order) {
+    val info = order.orderHeader.orderInfo
+    val buyer = info.parties.first { PartyRole.BUYER in it.partyRoles }
+    for (item in order.orderItems) {
+        erp.addLine(item.lineItemId, item.productId.supplierPid?.value, item.quantity, item.orderUnit)
+    }
+}
+```
+
+When you expect a specific type, `OpenTransXml.readAs<Order>(input)` returns it directly and
+throws a `DocumentTypeException` for any other type.
+
+Bytes are decoded the way the XML says: byte order mark first, then the `encoding` in the XML
+declaration, UTF-8 if there is neither. ISO-8859-1, windows-1252, UTF-8 and UTF-16 files all
+arrive with their umlauts intact. A `String` or `Reader` is taken as it is.
+
+### Send a document
+
+Create the document with the DSL (see [What you get](#what-you-get)), or derive it from an order
+you received:
 
 ```kotlin
 val response = order.toOrderResponse(date = LocalDate.now())
@@ -100,41 +236,80 @@ val dispatch = order.toDispatchNotification(id = "DN-1", date = "2026-11-24", qu
 val invoice  = order.toInvoice(id = "INV-1", date = "2026-11-30", vatRate = "0.19")
 ```
 
-### Typed UDX
-
-openTRANS leaves `HEADER_UDX` and `ITEM_UDX` open for your own fields. The library ships no UDX
-dialect. You describe yours once:
+Then write it as a `String`, to an `OutputStream`, a `Writer` or a file:
 
 ```kotlin
-data class Shipping(val carrier: String, val pickup: LocalDate?, val references: List<String>)
+val xml: String = OpenTransXml.write(invoice)
+OpenTransXml.write(invoice, Path.of("out/INV-1.xml"))
+OpenTransXml.write(invoice, httpResponse.outputStream)
+```
 
-object ShippingUdx : UdxType<Shipping>("UDX.ACME.SHIPPING", "urn:acme:udx") {
-    private val carrier    = required("CARRIER", Shipping::carrier, string(maxLength = 10))
-    private val pickup     = optional("PICKUP", Shipping::pickup, date())
-    private val references = list("REFERENCE", Shipping::references, string(), max = 3)
-    override fun create(v: Values) = Shipping(v[carrier], v[pickup], v[references])
+Output is always UTF-8 and is validated against the XSD before it is handed out. Streams you
+pass in are flushed but not closed.
+
+### Handle errors
+
+Every problem with a document or its data is an `OpenTransException` (package `.model`), so one
+`catch` at the edge of your system covers all of them. The subclasses tell you what went wrong:
+
+| Exception                      | When                                                                                         | What it tells you                                                    |
+|--------------------------------|----------------------------------------------------------------------------------------------|----------------------------------------------------------------------|
+| `OpenTransValidationException` | reading or writing XML that is not well-formed or not valid openTRANS, contains a DOCTYPE or has an unknown encoding | `errors`: every problem found, with line and column           |
+| `FacetViolationException`      | creating or changing a value the XSD forbids                                                 | the XML path and the rule, e.g. `ORDER_INFO/ORDER_ID: at most 250 characters, got 251` |
+| `IncompleteDocumentException`  | a required value is missing: in a builder, the order DSL, or when deriving a document        | `element`: the XML path of what is missing, e.g. `ORDER_INFO/CURRENCY` |
+| `DocumentTypeException`        | `readAs` finds another document type                                                         | `expected` and `found`                                               |
+| `UdxViolationException`        | reading or writing a typed UDX that breaks its description                                   | the path inside the UDX and the rule                                 |
+
+```kotlin
+try {
+    val order = OpenTransXml.readAs<Order>(body)
+    importOrder(order)
+} catch (e: OpenTransValidationException) {
+    replyToSender(e.errors)                       // the document itself is broken
+} catch (e: OpenTransException) {
+    log.warn("rejected: ${e.message}")            // wrong type, missing data, ...
 }
 ```
 
-Reading, writing, validation and optics follow from that description:
+Using the API the wrong way, such as giving `buyer { }` twice, is a programming error and throws
+a plain `IllegalStateException` or `IllegalArgumentException` instead. The validator's messages
+follow the JVM locale.
 
-```kotlin
-val shipping: Shipping? = order.orderHeader.orderInfo.headerUdx?.get(ShippingUdx)
+### Work with the full model
 
-val udx = Order.orderHeader.orderInfo.headerUdx.udx(ShippingUdx)
-val changed = udx.modify(order) { it.copy(carrier = "OTHER") }   // other UDX stay untouched
+The order DSL covers the everyday order. For everything else, every one of the 191 classes has a
+generated builder, from `Order { }` and `Invoice { }` down to `ProductPriceFix { }`. Your IDE's
+completion shows what is possible at each level.
 
-order(id = "PO-1", date = "2026-11-17") {
-    udx { add(ShippingUdx, Shipping("ACME", null, listOf("R-1"))) }
-    // ...
-}
-```
+Names follow the XML, so you find them from the specification:
 
-Fields can be `required`, `optional`, `list`, `attribute` or `optionalAttribute`. Simple types are
-`string`, `int`, `decimal`, `boolean`, `date`, `dateTime` and `enum`, or your own `SimpleType`;
-other `UdxType`s can be nested. A violation throws `UdxViolationException` with the path, e.g.
-`UDX.ACME.SHIPPING/CARRIER: at most 10 characters, got 11`. UDX content without a type is an
-immutable `XmlContent` tree that you can read and edit directly.
+- An element becomes its name in camel case: `ORDER_ID` → `orderId`, `DISPATCHNOTIFICATION` →
+  `DispatchNotification`.
+- Repeated elements are lists with plural names. List wrappers such as `ORDER_ITEM_LIST` are
+  left out, so `order.orderItems` is the list itself.
+- "Exactly one of" in the XSD is a sealed type named after what it holds, e.g.
+  `Payment.method` (`Card`, `Accounts`, `Debit`, ...) or `OrderItem.delivery`.
+- BMEcat elements whose names clash with openTRANS ones get a `Bmecat` prefix
+  (`BmecatProductPriceDetails`).
+
+### Typed UDX reference
+
+A `UdxType` (see [What you get](#what-you-get)) declares fields with `required`, `optional`,
+`list` (with `min` and `max`), `attribute` and `optionalAttribute`. Simple types are `string`
+(length, pattern), `int` and `decimal` (range), `boolean`, `date`, `dateTime` and `enum`, or a
+`SimpleType` of your own. Another `UdxType` can be used as a field type for nested elements.
+
+On UDX content: `content[Type]` reads one value, `getAll` reads all of them, and `with` /
+`withAll` set them in place. The optic `udx(Type)` works on any UDX property, including across
+lists (`Order.orderItems.every.itemUdx.udx(Type)`). UDX content without a type is an immutable
+`XmlContent` tree of `XmlElement`s and `XmlText`, which you can read and build directly.
+
+### Operations
+
+- `OpenTransXml` is thread-safe, and documents are immutable, so share them freely.
+- The schemas ship with the library. Nothing is ever loaded from the network.
+- A document is held in memory while it is validated and mapped. That is no problem for the
+  sizes openTRANS documents have in practice.
 
 ## Building
 
@@ -149,22 +324,52 @@ into `build/generated/opentrans/kotlin` of each module. Generated files are neve
 edited by hand. To change them, change the generator in `codegen` (naming rules and overrides are
 in `Names.kt`).
 
-[PLAN.md](PLAN.md) records the design decisions, schema findings and generator rules.
+## Design decisions
 
-## Scope
-
-- openTRANS 2.1 only.
-- No XML signatures. `XML_SIGNATURE` content is kept as an XML tree, not verified.
-- No business validation beyond the XSD (e.g. sums, unique line ids).
-- Customer-specific dialects that are not valid openTRANS belong in a converter outside this
-  library.
+- **Generated from the official XSD.** Model, reader, writer and builders all come from one
+  generator. They cannot drift apart, and the full standard is covered rather than a hand-picked
+  subset. Generated code is never edited by hand. Changes go into the generator.
+- **Strict in both directions.** Validating on read means the reader can rely on element order
+  and cardinality. Validating on write means nothing invalid reaches a partner. The XSD's
+  rules for single values (lengths, patterns, allowed values, number ranges) are also checked
+  when an object is created, so an error shows up where it is made, not later when the document
+  is written. Customer-specific dialects that are not valid openTRANS should be converted
+  outside the library, before they come in.
+- **Semantic round trip.** Reading and writing a document gives an equal document, not
+  byte-identical XML. Formatting, comments and namespace prefixes may differ.
+- **Plain StAX instead of a serialization library.** openTRANS has choices with repeated
+  alternatives, free XML content (UDX), case-insensitive booleans and partial dates. Generated
+  StAX code handles all of these directly and keeps the model free of XML annotations.
+- **Immutable data classes with optics.** Changes never have side effects. Arrow optics make deep
+  changes as short as reading.
+- **Precise values.** Amounts and quantities are `BigDecimal`, never `Double`. openTRANS dates may
+  be partial (`2009`, `2009-05`, a date, or a date-time with or without offset). `DateTime` keeps
+  the exact value and converts to `java.time` where possible.
+- **Enums only where the standard is closed.** Attributes like `type` that accept any word next
+  to the predefined ones stay `String`. Large code lists (currencies, units, languages,
+  countries) are strings as well.
+- **Readable Kotlin names, unchanged XML names.** `DISPATCHNOTIFICATION_ID` becomes
+  `dispatchNotificationId`, and choices are named after what they hold (`OrderItem.delivery`,
+  `Feature.value`). The XML stays exactly as the standard defines it.
+- **UDX as an extension point.** The library cannot know which extensions its users have, so it
+  ships none. It gives you the means to describe your own instead. UDX rarely comes with a
+  schema, so none is required. A type is described explicitly in Kotlin, without reflection,
+  annotations or compiler plugins.
+- **Secure parsing.** No DTDs, no external entities. The bundled schemas are loaded from the
+  classpath and never downloaded.
+- **One version, covered completely.** The library supports openTRANS 2.1, every document type
+  and every element of it, rather than several versions in part.
+- **The standard, nothing on top.** Validation covers what the XSD defines. Business rules such
+  as matching totals or unique line ids depend on your processes and belong in your code. XML
+  signatures are not verified: `XML_SIGNATURE` content is kept as an XML tree.
 
 ## License
 
 [MIT](LICENSE).
 
-The bundled XSDs in `opentrans-xml/src/main/resources/opentrans/xsd` are not covered by the MIT
-license. They are redistributed unchanged, with the copyright notices in their file headers:
+The bundled XSDs (in `opentrans-optics-xml`, under
+`src/main/resources/io/github/matthiasmack/opentrans/xsd`) are not covered by the MIT license.
+They are redistributed unchanged, with the copyright notices in their file headers:
 
 - `opentrans_2_1.xsd`: © 2000–2009 Fraunhofer IAO and Universität Duisburg-Essen BLI
 - `bmecat_2005.xsd`: © 2005 BME e.V. (BMEcat® 2005)

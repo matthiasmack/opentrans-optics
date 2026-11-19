@@ -1,8 +1,8 @@
 rootProject.name = "opentrans-optics"
 
 include(
-    "opentrans-model",
-    "opentrans-xml",
-    "opentrans-dsl",
+    "opentrans-optics-model",
+    "opentrans-optics-xml",
+    "opentrans-optics-dsl",
     "codegen",
 )

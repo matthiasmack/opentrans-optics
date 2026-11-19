@@ -4,7 +4,7 @@ plugins {
 }
 
 allprojects {
-    group = "opentrans"
+    group = "io.github.matthiasmack"
     version = "0.1.0-SNAPSHOT"
 }
 
