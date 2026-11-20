@@ -17,14 +17,23 @@ fun main(args: Array<String>) {
 
     val ir = IrBuilder(SchemaLoader.load(File(xsd))).build()
     when (mode) {
-        "model" -> ModelEmitter(pkg).emit(ir, outDir)
+        "model" -> {
+            ModelEmitter(pkg).emit(ir, outDir)
+        }
+
         "xml" -> {
             val modelPkg = args.getOrElse(4) { error("xml needs the model package") }
             ReaderEmitter(pkg, modelPkg).emit(ir, outDir)
             WriterEmitter(pkg, modelPkg).emit(ir, outDir)
         }
-        "dsl" -> DslEmitter(pkg, args.getOrElse(4) { error("dsl needs the model package") }).emit(ir, outDir)
-        else -> error("unknown mode $mode")
+
+        "dsl" -> {
+            DslEmitter(pkg, args.getOrElse(4) { error("dsl needs the model package") }).emit(ir, outDir)
+        }
+
+        else -> {
+            error("unknown mode $mode")
+        }
     }
     println("$mode: ${ir.classes.size} classes, ${ir.enums.size} enums, ${ir.choices.size} choices -> $outDir")
 }

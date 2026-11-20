@@ -11,12 +11,25 @@ import java.io.File
 fun main(args: Array<String>) {
     val model = SchemaLoader.load(File(args.single()))
     val ot = "http://www.opentrans.org/XMLSchema/2.1"
-    val roots = listOf("RFQ", "QUOTATION", "ORDER", "ORDERCHANGE", "ORDERRESPONSE", "DISPATCHNOTIFICATION",
-        "RECEIPTACKNOWLEDGEMENT", "INVOICE", "INVOICELIST", "REMITTANCEADVICE")
+    val roots =
+        listOf(
+            "RFQ",
+            "QUOTATION",
+            "ORDER",
+            "ORDERCHANGE",
+            "ORDERRESPONSE",
+            "DISPATCHNOTIFICATION",
+            "RECEIPTACKNOWLEDGEMENT",
+            "INVOICE",
+            "INVOICELIST",
+            "REMITTANCEADVICE",
+        )
     val reached = mutableSetOf<Pair<String, String>>()
+
     fun visit(e: XSElementDeclaration) {
         if (!reached.add(e.namespace to e.name)) return
         val t = e.typeDefinition as? XSComplexTypeDefinition ?: return
+
         fun walk(p: XSParticle) {
             when (val term = p.term) {
                 is XSElementDeclaration -> visit(term)
@@ -33,6 +46,11 @@ fun main(args: Array<String>) {
         val r = reached.count { it.first.substringAfterLast('/') == ns }
         println("$ns: ${els.size} global elements, $r reachable from openTRANS roots")
     }
-    val clashes = reached.groupBy { it.second }.filterValues { it.size > 1 }.keys.sorted()
+    val clashes =
+        reached
+            .groupBy { it.second }
+            .filterValues { it.size > 1 }
+            .keys
+            .sorted()
     println("reachable name clashes: $clashes")
 }

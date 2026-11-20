@@ -19,11 +19,21 @@ fun main(args: Array<String>) {
     for (i in 0 until globals.length) {
         val e = globals.item(i) as XSElementDeclaration
         byName.getOrPut(e.name) { mutableSetOf() } += e.namespace.substringAfterLast('/')
-        (e.typeDefinition as? XSSimpleTypeDefinition)?.let { if (it.anonymous && it.lexicalEnumeration.length > 0) anonEnums[e.name] = it.lexicalEnumeration.length }
+        (e.typeDefinition as? XSSimpleTypeDefinition)?.let {
+            if (it.anonymous &&
+                it.lexicalEnumeration.length > 0
+            ) {
+                anonEnums[e.name] = it.lexicalEnumeration.length
+            }
+        }
         val t = e.typeDefinition as? XSComplexTypeDefinition ?: continue
+
         fun walk(p: XSParticle) {
             when (val term = p.term) {
-                is XSElementDeclaration -> if (term.scope == XSConstants.SCOPE_LOCAL) local += "${e.name}/${term.name}"
+                is XSElementDeclaration -> {
+                    if (term.scope == XSConstants.SCOPE_LOCAL) local += "${e.name}/${term.name}"
+                }
+
                 is XSModelGroup -> {
                     if (p.maxOccursUnbounded || p.maxOccurs > 1) repeatedGroups += e.name
                     for (j in 0 until term.particles.length) walk(term.particles.item(j) as XSParticle)

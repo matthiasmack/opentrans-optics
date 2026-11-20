@@ -1,19 +1,13 @@
 package io.github.matthiasmack.opentrans.dsl
 
 import io.github.matthiasmack.opentrans.itscope.ItScopeUdx
-import io.github.matthiasmack.opentrans.model.ContractInformation
-import io.github.matthiasmack.opentrans.model.IncompleteDocumentException
-import io.github.matthiasmack.opentrans.model.InternationalPid
-import io.github.matthiasmack.opentrans.model.ProductComponent
-import io.github.matthiasmack.opentrans.model.ProductStockFix
-import io.github.matthiasmack.opentrans.model.ProductType
-import io.github.matthiasmack.opentrans.model.RecurringType
-import io.github.matthiasmack.opentrans.model.TotalRecurringAmount
-import io.github.matthiasmack.opentrans.udx.with
 import io.github.matthiasmack.opentrans.model.BuyerPid
+import io.github.matthiasmack.opentrans.model.ContractInformation
 import io.github.matthiasmack.opentrans.model.ControlInfo
 import io.github.matthiasmack.opentrans.model.DeliveryDate
 import io.github.matthiasmack.opentrans.model.DeliveryDateType
+import io.github.matthiasmack.opentrans.model.IncompleteDocumentException
+import io.github.matthiasmack.opentrans.model.InternationalPid
 import io.github.matthiasmack.opentrans.model.MlString
 import io.github.matthiasmack.opentrans.model.Order
 import io.github.matthiasmack.opentrans.model.OrderHeader
@@ -25,10 +19,16 @@ import io.github.matthiasmack.opentrans.model.OrderType
 import io.github.matthiasmack.opentrans.model.Party
 import io.github.matthiasmack.opentrans.model.PartyRole
 import io.github.matthiasmack.opentrans.model.Payment
+import io.github.matthiasmack.opentrans.model.ProductComponent
 import io.github.matthiasmack.opentrans.model.ProductId
 import io.github.matthiasmack.opentrans.model.ProductPriceFix
-import io.github.matthiasmack.opentrans.model.XmlContent
+import io.github.matthiasmack.opentrans.model.ProductStockFix
+import io.github.matthiasmack.opentrans.model.ProductType
+import io.github.matthiasmack.opentrans.model.RecurringType
 import io.github.matthiasmack.opentrans.model.SupplierPid
+import io.github.matthiasmack.opentrans.model.TotalRecurringAmount
+import io.github.matthiasmack.opentrans.model.XmlContent
+import io.github.matthiasmack.opentrans.udx.with
 import java.math.BigDecimal
 import java.math.RoundingMode
 
@@ -57,11 +57,17 @@ import java.math.RoundingMode
  * }
  * ```
  */
-fun order(id: String, date: Any, block: NewOrderBuilder.() -> Unit): Order =
-    NewOrderBuilder(id, date.toDateTime()).apply(block).build()
+fun order(
+    id: String,
+    date: Any,
+    block: NewOrderBuilder.() -> Unit,
+): Order = NewOrderBuilder(id, date.toDateTime()).apply(block).build()
 
 @OpenTransDsl
-class NewOrderBuilder internal constructor(private val id: String, private val date: io.github.matthiasmack.opentrans.model.DateTime) {
+class NewOrderBuilder internal constructor(
+    private val id: String,
+    private val date: io.github.matthiasmack.opentrans.model.DateTime,
+) {
     var type: OrderType = OrderType.STANDARD
 
     /** CONTROL_INFO/GENERATION_DATE; anything date-like. */
@@ -84,7 +90,11 @@ class NewOrderBuilder internal constructor(private val id: String, private val d
     private var udx: XmlContent? = null
     private val items = mutableListOf<NewOrderItemBuilder>()
 
-    fun delivery(from: Any, to: Any = from, type: DeliveryDateType? = null) {
+    fun delivery(
+        from: Any,
+        to: Any = from,
+        type: DeliveryDateType? = null,
+    ) {
         delivery = DeliveryDate(deliveryStartDate = from.toDateTime(), deliveryEndDate = to.toDateTime(), type = type)
     }
 
@@ -99,7 +109,10 @@ class NewOrderBuilder internal constructor(private val id: String, private val d
     }
 
     /** Any further party, e.g. delivery address or invoice recipient. */
-    fun party(vararg roles: PartyRole, block: NewPartyBuilder.() -> Unit) {
+    fun party(
+        vararg roles: PartyRole,
+        block: NewPartyBuilder.() -> Unit,
+    ) {
         otherParties += NewPartyBuilder(null).apply { role(*roles) }.apply(block).build()
     }
 
@@ -107,16 +120,28 @@ class NewOrderBuilder internal constructor(private val id: String, private val d
         payment = NewPaymentBuilder().apply(block).build()
     }
 
-    fun remark(text: String, type: String? = null, lang: String? = null) = remarks.remark(text, type, lang)
+    fun remark(
+        text: String,
+        type: String? = null,
+        lang: String? = null,
+    ) = remarks.remark(text, type, lang)
 
     /** Adds XML text to HEADER_UDX; several calls add up. */
     fun udx(xml: String) {
-        udx = udx.plus(io.github.matthiasmack.opentrans.dsl.udx(xml))
+        udx =
+            udx.plus(
+                io.github.matthiasmack.opentrans.dsl
+                    .udx(xml),
+            )
     }
 
     /** Adds typed UDX and XML to HEADER_UDX: `udx { add(ProjectInfoUdx, info) }`; several calls add up. */
     fun udx(block: XmlContentBuilder.() -> Unit) {
-        udx = udx.plus(io.github.matthiasmack.opentrans.dsl.udx(block))
+        udx =
+            udx.plus(
+                io.github.matthiasmack.opentrans.dsl
+                    .udx(block),
+            )
     }
 
     /** ITscope: ship with the buyer's own delivery note (UDX.DROPSHIPMENT). Agree on this with the distributor first. */
@@ -124,12 +149,21 @@ class NewOrderBuilder internal constructor(private val id: String, private val d
         udx = (udx ?: XmlContent.EMPTY).with(ItScopeUdx.DROPSHIPMENT, ownDeliveryNote)
     }
 
-    fun item(quantity: Number, unit: String, lineItemId: String? = null, block: NewOrderItemBuilder.() -> Unit) {
+    fun item(
+        quantity: Number,
+        unit: String,
+        lineItemId: String? = null,
+        block: NewOrderItemBuilder.() -> Unit,
+    ) {
         items += NewOrderItemBuilder(lineItemId, quantity.toDecimal(), unit).apply(block)
     }
 
-    fun item(quantity: String, unit: String, lineItemId: String? = null, block: NewOrderItemBuilder.() -> Unit) =
-        item(quantity.toDecimal(), unit, lineItemId, block)
+    fun item(
+        quantity: String,
+        unit: String,
+        lineItemId: String? = null,
+        block: NewOrderItemBuilder.() -> Unit,
+    ) = item(quantity.toDecimal(), unit, lineItemId, block)
 
     internal fun build(): Order {
         val buyer = buyer ?: throw IncompleteDocumentException("ORDER_INFO/PARTIES/PARTY", "an order needs a buyer { }")
@@ -142,39 +176,57 @@ class NewOrderBuilder internal constructor(private val id: String, private val d
 
         return Order(
             type = type,
-            orderHeader = OrderHeader(
-                controlInfo = generationDate?.let { ControlInfo(generationDate = it.toDateTime()) },
-                orderInfo = OrderInfo(
-                    orderId = id,
-                    orderDate = date,
-                    deliveryDate = delivery,
-                    parties = listOf(buyer, supplier) + otherParties,
-                    orderPartiesReference = OrderPartiesReference(buyerIdref = buyer.partyIds.first(), supplierIdref = supplier.partyIds.first()),
-                    currency = currency,
-                    payment = payment,
-                    termsAndConditions = termsAndConditions,
-                    partialShipmentAllowed = partialShipmentAllowed,
-                    subscriptionType = subscriptionType,
-                    remarks = remarks.remarks.toList(),
-                    headerUdx = udx,
+            orderHeader =
+                OrderHeader(
+                    controlInfo = generationDate?.let { ControlInfo(generationDate = it.toDateTime()) },
+                    orderInfo =
+                        OrderInfo(
+                            orderId = id,
+                            orderDate = date,
+                            deliveryDate = delivery,
+                            parties = listOf(buyer, supplier) + otherParties,
+                            orderPartiesReference =
+                                OrderPartiesReference(
+                                    buyerIdref = buyer.partyIds.first(),
+                                    supplierIdref = supplier.partyIds.first(),
+                                ),
+                            currency = currency,
+                            payment = payment,
+                            termsAndConditions = termsAndConditions,
+                            partialShipmentAllowed = partialShipmentAllowed,
+                            subscriptionType = subscriptionType,
+                            remarks = remarks.remarks.toList(),
+                            headerUdx = udx,
+                        ),
                 ),
-            ),
             orderItems = builtItems,
-            orderSummary = OrderSummary(
-                totalItemNum = builtItems.size,
-                totalAmount = if (lineAmounts.isNotEmpty() && lineAmounts.all { it != null }) lineAmounts.filterNotNull().reduce(BigDecimal::add) else null,
-                totalRecurringAmounts = recurringTotals(recurring),
-            ),
+            orderSummary =
+                OrderSummary(
+                    totalItemNum = builtItems.size,
+                    totalAmount =
+                        if (lineAmounts.isNotEmpty() &&
+                            lineAmounts.all { it != null }
+                        ) {
+                            lineAmounts.filterNotNull().reduce(BigDecimal::add)
+                        } else {
+                            null
+                        },
+                    totalRecurringAmounts = recurringTotals(recurring),
+                ),
         )
     }
 
     /** ITscope: per billing unit (the ORDER_UNIT MON, ANN or DAY) the sum of the recurring line amounts. */
     private fun recurringTotals(recurring: List<OrderItem>): List<TotalRecurringAmount> =
-        recurring.groupBy { item -> RecurringType.entries.firstOrNull { it.xml == item.orderUnit } }
+        recurring
+            .groupBy { item -> RecurringType.entries.firstOrNull { it.xml == item.orderUnit } }
             .mapNotNull { (unit, group) ->
                 val amounts = group.map { it.priceLineAmount }
-                if (unit == null || amounts.any { it == null }) null
-                else TotalRecurringAmount(amounts.filterNotNull().reduce(BigDecimal::add), unit)
+                if (unit == null || amounts.any { it == null }) {
+                    null
+                } else {
+                    TotalRecurringAmount(amounts.filterNotNull().reduce(BigDecimal::add), unit)
+                }
             }
 }
 
@@ -207,7 +259,10 @@ class NewOrderItemBuilder internal constructor(
     private var components: List<ProductComponent>? = null
 
     /** INTERNATIONAL_PID, e.g. `internationalPid("6676919000", "itscope")` or an EAN with type "ean". */
-    fun internationalPid(value: String, type: String? = null) {
+    fun internationalPid(
+        value: String,
+        type: String? = null,
+    ) {
         internationalPids += InternationalPid(value, type)
     }
 
@@ -218,10 +273,18 @@ class NewOrderItemBuilder internal constructor(
      * the parts list is shown on the platform. Bundles inside bundles are not
      * supported, as with ITscope.
      */
-    fun bundle(partsListVisible: Boolean? = null, block: NewBundleBuilder.() -> Unit) {
+    fun bundle(
+        partsListVisible: Boolean? = null,
+        block: NewBundleBuilder.() -> Unit,
+    ) {
         check(components == null) { "bundle { } may only be given once per item" }
         val parts = NewBundleBuilder().apply(block).components.toList()
-        if (parts.isEmpty()) throw IncompleteDocumentException("PRODUCT_COMPONENTS/PRODUCT_COMPONENT", "bundle { } needs at least one component(...) { }")
+        if (parts.isEmpty()) {
+            throw IncompleteDocumentException(
+                "PRODUCT_COMPONENTS/PRODUCT_COMPONENT",
+                "bundle { } needs at least one component(...) { }",
+            )
+        }
         components = parts
         partsListVisible?.let { udx = (udx ?: XmlContent.EMPTY).with(ItScopeUdx.BUNDLE_PARTS_LIST_VISIBLE, it) }
     }
@@ -232,74 +295,120 @@ class NewOrderItemBuilder internal constructor(
      * `contract(period = 12, unit = RecurringType.MON, billing = 1)` for twelve
      * months, billed monthly.
      */
-    fun contract(period: Int? = null, unit: RecurringType? = null, billing: Int? = null, reference: String? = null) {
-        contract = ContractInformation(subscriptionPeriod = period, subscriptionPeriodUnit = unit, billingPeriod = billing, subscriptionReference = reference)
+    fun contract(
+        period: Int? = null,
+        unit: RecurringType? = null,
+        billing: Int? = null,
+        reference: String? = null,
+    ) {
+        contract =
+            ContractInformation(
+                subscriptionPeriod = period,
+                subscriptionPeriodUnit = unit,
+                billingPeriod = billing,
+                subscriptionReference = reference,
+            )
     }
 
     /** ITscope: stock at the time of ordering (PRODUCT_STOCK_FIX). */
-    fun stock(amount: Number, status: String? = null) {
+    fun stock(
+        amount: Number,
+        status: String? = null,
+    ) {
         stock = ProductStockFix(stockAmount = amount.toDecimal(), stockStatus = status)
     }
 
-    fun supplierPid(value: String, type: String? = null) {
+    fun supplierPid(
+        value: String,
+        type: String? = null,
+    ) {
         supplierPid = SupplierPid(value, type)
     }
 
-    fun buyerPid(value: String, type: String? = null) {
+    fun buyerPid(
+        value: String,
+        type: String? = null,
+    ) {
         buyerPids += BuyerPid(value, type)
     }
 
     /** DESCRIPTION_SHORT, once per language. */
-    fun description(text: String, lang: String? = null) {
+    fun description(
+        text: String,
+        lang: String? = null,
+    ) {
         descriptionsShort += MlString(text, lang)
     }
 
     /** DESCRIPTION_LONG, once per language. */
-    fun longDescription(text: String, lang: String? = null) {
+    fun longDescription(
+        text: String,
+        lang: String? = null,
+    ) {
         descriptionsLong += MlString(text, lang)
     }
 
     /** Unit price; [per] is the price quantity (e.g. price per 100 pieces). */
-    fun price(amount: String, per: Number? = null) {
+    fun price(
+        amount: String,
+        per: Number? = null,
+    ) {
         priceFix = ProductPriceFix(priceAmount = amount.toDecimal(), priceQuantity = per?.toDecimal())
     }
 
-    fun price(amount: Number, per: Number? = null) {
+    fun price(
+        amount: Number,
+        per: Number? = null,
+    ) {
         priceFix = ProductPriceFix(priceAmount = amount.toDecimal(), priceQuantity = per?.toDecimal())
     }
 
-    fun remark(text: String, type: String? = null, lang: String? = null) = remarks.remark(text, type, lang)
+    fun remark(
+        text: String,
+        type: String? = null,
+        lang: String? = null,
+    ) = remarks.remark(text, type, lang)
 
     /** Adds XML text to ITEM_UDX; several calls add up. */
     fun udx(xml: String) {
-        udx = udx.plus(io.github.matthiasmack.opentrans.dsl.udx(xml))
+        udx =
+            udx.plus(
+                io.github.matthiasmack.opentrans.dsl
+                    .udx(xml),
+            )
     }
 
     /** Adds typed UDX and XML to ITEM_UDX: `udx { add(ProjectInfoUdx, info) }`; several calls add up. */
     fun udx(block: XmlContentBuilder.() -> Unit) {
-        udx = udx.plus(io.github.matthiasmack.opentrans.dsl.udx(block))
+        udx =
+            udx.plus(
+                io.github.matthiasmack.opentrans.dsl
+                    .udx(block),
+            )
     }
 
-    internal fun build(defaultLineItemId: String) = OrderItem(
-        lineItemId = lineItemId ?: defaultLineItemId,
-        productId = ProductId(
-            supplierPid = supplierPid,
-            buyerPids = buyerPids.toList(),
-            shortDescriptions = descriptionsShort.toList(),
-            longDescriptions = descriptionsLong.toList(),
-            internationalPids = internationalPids.toList(),
-            productType = if (components != null) ProductType.BUNDLE else productType,
-        ),
-        productComponents = components ?: emptyList(),
-        quantity = quantity,
-        orderUnit = unit,
-        productPriceFix = priceFix,
-        productStockFix = stock,
-        priceLineAmount = lineAmount ?: priceFix?.let(::computeLineAmount),
-        contractInformation = contract,
-        remarks = remarks.remarks.toList(),
-        itemUdx = udx,
-    )
+    internal fun build(defaultLineItemId: String) =
+        OrderItem(
+            lineItemId = lineItemId ?: defaultLineItemId,
+            productId =
+                ProductId(
+                    supplierPid = supplierPid,
+                    buyerPids = buyerPids.toList(),
+                    shortDescriptions = descriptionsShort.toList(),
+                    longDescriptions = descriptionsLong.toList(),
+                    internationalPids = internationalPids.toList(),
+                    productType = if (components != null) ProductType.BUNDLE else productType,
+                ),
+            productComponents = components ?: emptyList(),
+            quantity = quantity,
+            orderUnit = unit,
+            productPriceFix = priceFix,
+            productStockFix = stock,
+            priceLineAmount = lineAmount ?: priceFix?.let(::computeLineAmount),
+            contractInformation = contract,
+            remarks = remarks.remarks.toList(),
+            itemUdx = udx,
+        )
 
     /**
      * quantity x amount / price quantity, rounded half-up to the precision of
@@ -318,17 +427,27 @@ class NewOrderItemBuilder internal constructor(
 class NewBundleBuilder internal constructor() {
     internal val components = mutableListOf<ProductComponent>()
 
-    fun component(quantity: Number, unit: String, block: NewComponentBuilder.() -> Unit) {
+    fun component(
+        quantity: Number,
+        unit: String,
+        block: NewComponentBuilder.() -> Unit,
+    ) {
         components += NewComponentBuilder(quantity.toDecimal(), unit).apply(block).build()
     }
 
-    fun component(quantity: String, unit: String, block: NewComponentBuilder.() -> Unit) =
-        component(quantity.toDecimal(), unit, block)
+    fun component(
+        quantity: String,
+        unit: String,
+        block: NewComponentBuilder.() -> Unit,
+    ) = component(quantity.toDecimal(), unit, block)
 }
 
 /** PRODUCT_COMPONENT: one part of a bundle, with PRODUCT_TYPE "component". */
 @OpenTransDsl
-class NewComponentBuilder internal constructor(private val quantity: BigDecimal, private val unit: String) {
+class NewComponentBuilder internal constructor(
+    private val quantity: BigDecimal,
+    private val unit: String,
+) {
     private var supplierPid: SupplierPid? = null
     private val buyerPids = mutableListOf<BuyerPid>()
     private val internationalPids = mutableListOf<InternationalPid>()
@@ -336,49 +455,72 @@ class NewComponentBuilder internal constructor(private val quantity: BigDecimal,
     private val descriptionsLong = mutableListOf<MlString>()
     private var priceFix: ProductPriceFix? = null
 
-    fun supplierPid(value: String, type: String? = null) {
+    fun supplierPid(
+        value: String,
+        type: String? = null,
+    ) {
         supplierPid = SupplierPid(value, type)
     }
 
-    fun buyerPid(value: String, type: String? = null) {
+    fun buyerPid(
+        value: String,
+        type: String? = null,
+    ) {
         buyerPids += BuyerPid(value, type)
     }
 
     /** INTERNATIONAL_PID, e.g. an EAN with type "ean" or the ITscope product id with type "itscope". */
-    fun internationalPid(value: String, type: String? = null) {
+    fun internationalPid(
+        value: String,
+        type: String? = null,
+    ) {
         internationalPids += InternationalPid(value, type)
     }
 
     /** DESCRIPTION_SHORT, once per language. */
-    fun description(text: String, lang: String? = null) {
+    fun description(
+        text: String,
+        lang: String? = null,
+    ) {
         descriptionsShort += MlString(text, lang)
     }
 
     /** DESCRIPTION_LONG, once per language. */
-    fun longDescription(text: String, lang: String? = null) {
+    fun longDescription(
+        text: String,
+        lang: String? = null,
+    ) {
         descriptionsLong += MlString(text, lang)
     }
 
     /** Unit price of the part, if the bundle lists one; [per] is the price quantity. */
-    fun price(amount: String, per: Number? = null) {
+    fun price(
+        amount: String,
+        per: Number? = null,
+    ) {
         priceFix = ProductPriceFix(priceAmount = amount.toDecimal(), priceQuantity = per?.toDecimal())
     }
 
-    fun price(amount: Number, per: Number? = null) {
+    fun price(
+        amount: Number,
+        per: Number? = null,
+    ) {
         priceFix = ProductPriceFix(priceAmount = amount.toDecimal(), priceQuantity = per?.toDecimal())
     }
 
-    internal fun build() = ProductComponent(
-        productId = ProductId(
-            supplierPid = supplierPid,
-            buyerPids = buyerPids.toList(),
-            internationalPids = internationalPids.toList(),
-            shortDescriptions = descriptionsShort.toList(),
-            longDescriptions = descriptionsLong.toList(),
-            productType = ProductType.COMPONENT,
-        ),
-        quantity = quantity,
-        orderUnit = unit,
-        productPriceFix = priceFix,
-    )
+    internal fun build() =
+        ProductComponent(
+            productId =
+                ProductId(
+                    supplierPid = supplierPid,
+                    buyerPids = buyerPids.toList(),
+                    internationalPids = internationalPids.toList(),
+                    shortDescriptions = descriptionsShort.toList(),
+                    longDescriptions = descriptionsLong.toList(),
+                    productType = ProductType.COMPONENT,
+                ),
+            quantity = quantity,
+            orderUnit = unit,
+            productPriceFix = priceFix,
+        )
 }

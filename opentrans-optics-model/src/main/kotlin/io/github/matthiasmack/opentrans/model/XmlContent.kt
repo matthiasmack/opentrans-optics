@@ -27,7 +27,9 @@ import javax.xml.stream.XMLStreamReader
 sealed interface XmlNode
 
 /** Text content. */
-data class XmlText(val text: String) : XmlNode
+data class XmlText(
+    val text: String,
+) : XmlNode
 
 /**
  * An element. [name] carries the namespace; its prefix is only a hint for
@@ -44,7 +46,13 @@ data class XmlElement(
     }
 
     /** Element in a namespace; `prefix` is only a hint for writing. */
-    constructor(localName: String, namespace: String = "", prefix: String = "", attributes: Map<QName, String> = emptyMap(), children: List<XmlNode> = emptyList()) :
+    constructor(
+        localName: String,
+        namespace: String = "",
+        prefix: String = "",
+        attributes: Map<QName, String> = emptyMap(),
+        children: List<XmlNode> = emptyList(),
+    ) :
         this(QName(namespace, localName, prefix), attributes, children)
 
     val elements: List<XmlElement> get() = children.filterIsInstance<XmlElement>()
@@ -68,7 +76,9 @@ data class XmlElement(
 }
 
 /** The content of an xsd:anyType element: elements and text, in document order. */
-data class XmlContent(val nodes: List<XmlNode>) {
+data class XmlContent(
+    val nodes: List<XmlNode>,
+) {
     constructor(vararg nodes: XmlNode) : this(nodes.toList())
 
     val elements: List<XmlElement> get() = nodes.filterIsInstance<XmlElement>()
@@ -121,7 +131,11 @@ data class XmlContent(val nodes: List<XmlNode>) {
          * and leaves the reader on its END_ELEMENT. Used by opentrans-optics-xml.
          */
         fun read(reader: XMLStreamReader): XmlContent {
-            class Open(val name: QName, val attributes: Map<QName, String>, val children: MutableList<XmlNode> = mutableListOf())
+            class Open(
+                val name: QName,
+                val attributes: Map<QName, String>,
+                val children: MutableList<XmlNode> = mutableListOf(),
+            )
 
             val top = mutableListOf<XmlNode>()
             val open = ArrayDeque<Open>()
@@ -132,10 +146,13 @@ data class XmlContent(val nodes: List<XmlNode>) {
                         for (i in 0 until reader.attributeCount) attributes[reader.getAttributeName(i)] = reader.getAttributeValue(i)
                         open.addLast(Open(reader.name, attributes))
                     }
+
                     END_ELEMENT -> {
-                        val closed = open.removeLastOrNull() ?: return XmlContent(top.map { if (it is XmlText) XmlText(it.text.trim()) else it })
+                        val closed =
+                            open.removeLastOrNull() ?: return XmlContent(top.map { if (it is XmlText) XmlText(it.text.trim()) else it })
                         (open.lastOrNull()?.children ?: top) += XmlElement(closed.name, closed.attributes, closed.children)
                     }
+
                     CHARACTERS, CDATA, SPACE -> {
                         val text = reader.text
                         if (text.isNotBlank()) {
@@ -144,22 +161,28 @@ data class XmlContent(val nodes: List<XmlNode>) {
                             if (previous is XmlText) target[target.lastIndex] = XmlText(previous.text + text) else target += XmlText(text)
                         }
                     }
-                    else -> Unit // comments, processing instructions
+
+                    else -> {
+                        // comments and processing instructions are not kept
+                    }
                 }
             }
         }
 
-        private val factory: XMLInputFactory = XMLInputFactory.newFactory().apply {
-            setProperty(XMLInputFactory.SUPPORT_DTD, false)
-            setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false)
-            setProperty(XMLInputFactory.IS_NAMESPACE_AWARE, true)
-            setProperty(XMLInputFactory.IS_COALESCING, true)
-        }
+        private val factory: XMLInputFactory =
+            XMLInputFactory.newFactory().apply {
+                setProperty(XMLInputFactory.SUPPORT_DTD, false)
+                setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false)
+                setProperty(XMLInputFactory.IS_NAMESPACE_AWARE, true)
+                setProperty(XMLInputFactory.IS_COALESCING, true)
+            }
     }
 }
 
 /** Writes nodes compactly (no indentation, so mixed content stays as it is) and declares namespaces where needed. */
-private class XmlSerializer(inScope: Map<String, String>) {
+private class XmlSerializer(
+    inScope: Map<String, String>,
+) {
     private val out = StringBuilder()
     private val root: Map<String, String> = inScope + ("xml" to XMLConstants.XML_NS_URI)
 
@@ -169,17 +192,27 @@ private class XmlSerializer(inScope: Map<String, String>) {
 
     fun element(e: XmlElement) = node(e, root)
 
-    private fun node(node: XmlNode, scope: Map<String, String>) {
+    private fun node(
+        node: XmlNode,
+        scope: Map<String, String>,
+    ) {
         when (node) {
             is XmlText -> out.append(escapeXml(node.text, attribute = false))
             is XmlElement -> element(node, scope)
         }
     }
 
-    private fun element(e: XmlElement, outer: Map<String, String>) {
+    private fun element(
+        e: XmlElement,
+        outer: Map<String, String>,
+    ) {
         var scope = outer
         val declarations = LinkedHashMap<String, String>()
-        fun bind(prefix: String, namespace: String) {
+
+        fun bind(
+            prefix: String,
+            namespace: String,
+        ) {
             if ((scope[prefix] ?: "") != namespace) {
                 declarations[prefix] = namespace
                 scope = scope + (prefix to namespace)
@@ -191,24 +224,48 @@ private class XmlSerializer(inScope: Map<String, String>) {
         bind(prefix, namespace)
         val tag = qualified(prefix, e.name.localPart)
 
-        val attributes = e.attributes.map { (name, value) ->
-            val ns = name.namespaceURI
-            val attributePrefix = when {
-                ns.isEmpty() -> ""
-                ns == XMLConstants.XML_NS_URI -> "xml"
-                name.prefix.isNotEmpty() && (scope[name.prefix] == ns || name.prefix !in declarations) -> name.prefix
-                else -> scope.entries.firstOrNull { it.key.isNotEmpty() && it.value == ns }?.key
-                    ?: generateSequence(1) { it + 1 }.map { "ns$it" }.first { it !in scope }
+        val attributes =
+            e.attributes.map { (name, value) ->
+                val ns = name.namespaceURI
+                val attributePrefix =
+                    when {
+                        ns.isEmpty() -> {
+                            ""
+                        }
+
+                        ns == XMLConstants.XML_NS_URI -> {
+                            "xml"
+                        }
+
+                        name.prefix.isNotEmpty() && (scope[name.prefix] == ns || name.prefix !in declarations) -> {
+                            name.prefix
+                        }
+
+                        else -> {
+                            scope.entries.firstOrNull { it.key.isNotEmpty() && it.value == ns }?.key
+                                ?: generateSequence(1) { it + 1 }.map { "ns$it" }.first { it !in scope }
+                        }
+                    }
+                if (attributePrefix.isNotEmpty()) bind(attributePrefix, ns)
+                qualified(attributePrefix, name.localPart) to value
             }
-            if (attributePrefix.isNotEmpty()) bind(attributePrefix, ns)
-            qualified(attributePrefix, name.localPart) to value
-        }
 
         out.append('<').append(tag)
         for ((p, ns) in declarations) {
-            out.append(if (p.isEmpty()) " xmlns" else " xmlns:$p").append("=\"").append(escapeXml(ns, attribute = true)).append('"')
+            out
+                .append(if (p.isEmpty()) " xmlns" else " xmlns:$p")
+                .append("=\"")
+                .append(escapeXml(ns, attribute = true))
+                .append('"')
         }
-        for ((name, value) in attributes) out.append(' ').append(name).append("=\"").append(escapeXml(value, attribute = true)).append('"')
+        for ((name, value) in attributes) {
+            out
+                .append(' ')
+                .append(name)
+                .append("=\"")
+                .append(escapeXml(value, attribute = true))
+                .append('"')
+        }
         if (e.children.isEmpty()) {
             out.append("/>")
         } else {
@@ -218,17 +275,24 @@ private class XmlSerializer(inScope: Map<String, String>) {
         }
     }
 
-    private fun qualified(prefix: String, local: String) = if (prefix.isEmpty()) local else "$prefix:$local"
+    private fun qualified(
+        prefix: String,
+        local: String,
+    ) = if (prefix.isEmpty()) local else "$prefix:$local"
 }
 
-internal fun escapeXml(text: String, attribute: Boolean): String = buildString(text.length) {
-    for (c in text) {
-        when (c) {
-            '&' -> append("&amp;")
-            '<' -> append("&lt;")
-            '>' -> append("&gt;")
-            '"' -> if (attribute) append("&quot;") else append(c)
-            else -> append(c)
+internal fun escapeXml(
+    text: String,
+    attribute: Boolean,
+): String =
+    buildString(text.length) {
+        for (c in text) {
+            when (c) {
+                '&' -> append("&amp;")
+                '<' -> append("&lt;")
+                '>' -> append("&gt;")
+                '"' -> if (attribute) append("&quot;") else append(c)
+                else -> append(c)
+            }
         }
     }
-}

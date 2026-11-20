@@ -1,11 +1,11 @@
 package io.github.matthiasmack.opentrans.dsl
 
-import io.github.matthiasmack.opentrans.model.OrderReference
-import io.github.matthiasmack.opentrans.model.IncompleteDocumentException
 import io.github.matthiasmack.opentrans.model.DispatchNotification
+import io.github.matthiasmack.opentrans.model.IncompleteDocumentException
 import io.github.matthiasmack.opentrans.model.Invoice
 import io.github.matthiasmack.opentrans.model.Order
 import io.github.matthiasmack.opentrans.model.OrderItem
+import io.github.matthiasmack.opentrans.model.OrderReference
 import io.github.matthiasmack.opentrans.model.OrderResponse
 import io.github.matthiasmack.opentrans.model.ShipmentPartiesReference
 import io.github.matthiasmack.opentrans.model.TaxDetailsFix
@@ -34,7 +34,11 @@ import java.math.RoundingMode
  * }
  * ```
  */
-fun Order.toOrderResponse(date: Any, referenceLines: Boolean = true, block: OrderResponseBuilder.() -> Unit = {}): OrderResponse {
+fun Order.toOrderResponse(
+    date: Any,
+    referenceLines: Boolean = true,
+    block: OrderResponseBuilder.() -> Unit = {},
+): OrderResponse {
     val info = orderHeader.orderInfo
     val items = orderItems
     return OrderResponse {
@@ -84,10 +88,16 @@ fun Order.toDispatchNotification(
     val info = orderHeader.orderInfo
     val references = info.orderPartiesReference
     val shipment = references.shipmentPartiesReference ?: ShipmentPartiesReference(deliveryIdref = references.buyerIdref)
-    val shipped = orderItems
-        .map { it to (quantities[it.lineItemId]?.toDecimal() ?: it.quantity) }
-        .filter { (_, quantity) -> quantity.signum() > 0 }
-    if (shipped.isEmpty()) throw IncompleteDocumentException("DISPATCHNOTIFICATION_ITEM_LIST/DISPATCHNOTIFICATION_ITEM", "A dispatch notification needs at least one item with a quantity above 0")
+    val shipped =
+        orderItems
+            .map { it to (quantities[it.lineItemId]?.toDecimal() ?: it.quantity) }
+            .filter { (_, quantity) -> quantity.signum() > 0 }
+    if (shipped.isEmpty()) {
+        throw IncompleteDocumentException(
+            "DISPATCHNOTIFICATION_ITEM_LIST/DISPATCHNOTIFICATION_ITEM",
+            "A dispatch notification needs at least one item with a quantity above 0",
+        )
+    }
     val unknown = quantities.keys - orderItems.map { it.lineItemId }.toSet()
     require(unknown.isEmpty()) { "Unknown line item ids: $unknown" }
 
@@ -139,7 +149,8 @@ fun Order.toInvoice(
     val info = orderHeader.orderInfo
     val references = info.orderPartiesReference
     val rate = BigDecimal(vatRate)
-    val currency = info.currency ?: throw IncompleteDocumentException("ORDER_INFO/CURRENCY", "The order has no CURRENCY; an invoice needs one")
+    val currency =
+        info.currency ?: throw IncompleteDocumentException("ORDER_INFO/CURRENCY", "The order has no CURRENCY; an invoice needs one")
     val lines = orderItems.map { it to lineAmount(it) }
     val net = lines.map { it.second }.reduce(BigDecimal::add)
     val tax = net.multiply(rate).setScale(2, RoundingMode.HALF_UP)
@@ -169,9 +180,10 @@ fun Order.toInvoice(
                 productId = item.productId
                 quantity = item.quantity
                 orderUnit = item.orderUnit
-                productPriceFix = item.productPriceFix!!.let { price ->
-                    if (price.taxDetailsFixes.isEmpty()) price.copy(taxDetailsFixes = listOf(vat)) else price
-                }
+                productPriceFix =
+                    item.productPriceFix!!.let { price ->
+                        if (price.taxDetailsFixes.isEmpty()) price.copy(taxDetailsFixes = listOf(vat)) else price
+                    }
                 priceLineAmount = amount
                 orderReference {
                     orderId = info.orderId
@@ -191,7 +203,12 @@ fun Order.toInvoice(
 
 private fun lineAmount(item: OrderItem): BigDecimal {
     item.priceLineAmount?.let { return it }
-    val price = item.productPriceFix ?: throw IncompleteDocumentException("ORDER_ITEM/PRODUCT_PRICE_FIX", "Item ${item.lineItemId} has no price; an invoice needs one for every item")
+    val price =
+        item.productPriceFix
+            ?: throw IncompleteDocumentException(
+                "ORDER_ITEM/PRODUCT_PRICE_FIX",
+                "Item ${item.lineItemId} has no price; an invoice needs one for every item",
+            )
     val perUnit = price.priceQuantity ?: BigDecimal.ONE
     return item.quantity.multiply(price.priceAmount).divide(perUnit, maxOf(price.priceAmount.scale(), 2), RoundingMode.HALF_UP)
 }

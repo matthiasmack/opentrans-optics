@@ -1,7 +1,7 @@
 package io.github.matthiasmack.opentrans.xml
 
-import io.github.matthiasmack.opentrans.model.OpenTransValidationException
 import io.github.matthiasmack.opentrans.model.DocumentTypeException
+import io.github.matthiasmack.opentrans.model.OpenTransValidationException
 import io.github.matthiasmack.opentrans.model.Order
 import io.github.matthiasmack.opentrans.model.spikeOrder
 import java.io.ByteArrayInputStream
@@ -21,7 +21,6 @@ import kotlin.test.assertFalse
 
 /** Files, streams, encodings and concurrent use of [OpenTransXml]. */
 class InputOutputTest {
-
     private fun sample(name: String) = javaClass.getResource("/samples/$name")!!.readText()
 
     /** The spike order with umlauts in a remark, declared with [encoding]. */
@@ -29,12 +28,21 @@ class InputOutputTest {
         val xml = sample("order-spike.xml").replace("Bitte an Tor 2 liefern.", "Größe prüfen, Tür 2")
         val declaration = """<?xml version="1.0" encoding="UTF-8"?>"""
         check(xml.startsWith(declaration))
-        return if (encoding == null) xml.removePrefix(declaration).trimStart() else xml.replace(declaration, """<?xml version="1.0" encoding="$encoding"?>""")
+        return if (encoding ==
+            null
+        ) {
+            xml.removePrefix(declaration).trimStart()
+        } else {
+            xml.replace(declaration, """<?xml version="1.0" encoding="$encoding"?>""")
+        }
     }
 
     private val expected: Order by lazy { OpenTransXml.readAs(withUmlauts("UTF-8")) }
 
-    private fun remark(order: Order) = order.orderHeader.orderInfo.remarks.first().value
+    private fun remark(order: Order) =
+        order.orderHeader.orderInfo.remarks
+            .first()
+            .value
 
     // --- encodings ---
 
@@ -50,7 +58,7 @@ class InputOutputTest {
 
     @Test
     fun `UTF-16 and byte order marks are recognised`() {
-        assertEquals(expected, OpenTransXml.readAs(withUmlauts("UTF-16").toByteArray(Charsets.UTF_16)))   // with BOM
+        assertEquals(expected, OpenTransXml.readAs(withUmlauts("UTF-16").toByteArray(Charsets.UTF_16))) // with BOM
         val utf8Bom = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()) + withUmlauts("UTF-8").toByteArray()
         assertEquals(expected, OpenTransXml.readAs(utf8Bom))
     }
@@ -65,7 +73,7 @@ class InputOutputTest {
         // Like the official invoice and dispatch notification samples: UTF-8 bytes declared as ISO-8859-1.
         // Every conforming XML parser reads them this way; the library does not guess.
         val mislabelled = withUmlauts("ISO-8859-1").toByteArray(Charsets.UTF_8)
-        val garbled = String("Größe prüfen, Tür 2".toByteArray(Charsets.UTF_8), Charsets.ISO_8859_1)   // "GrÃ¶Ã\u009Fe ..."
+        val garbled = String("Größe prüfen, Tür 2".toByteArray(Charsets.UTF_8), Charsets.ISO_8859_1) // "GrÃ¶Ã\u009Fe ..."
         assertEquals(garbled, remark(OpenTransXml.readAs(mislabelled)))
     }
 
@@ -98,9 +106,12 @@ class InputOutputTest {
     @Test
     fun `streams are read and written without being closed`() {
         var closed = false
-        val input = object : FilterInputStream(ByteArrayInputStream(withUmlauts("ISO-8859-1").toByteArray(Charsets.ISO_8859_1))) {
-            override fun close() { closed = true }
-        }
+        val input =
+            object : FilterInputStream(ByteArrayInputStream(withUmlauts("ISO-8859-1").toByteArray(Charsets.ISO_8859_1))) {
+                override fun close() {
+                    closed = true
+                }
+            }
         assertEquals(expected, OpenTransXml.readAs(input))
         assertFalse(closed)
 
@@ -129,9 +140,10 @@ class InputOutputTest {
 
         val pool = Executors.newFixedThreadPool(8)
         try {
-            val tasks = (1..200).map { i ->
-                Callable { i % samples.size to OpenTransXml.write(OpenTransXml.read(samples[i % samples.size])) }
-            }
+            val tasks =
+                (1..200).map { i ->
+                    Callable { i % samples.size to OpenTransXml.write(OpenTransXml.read(samples[i % samples.size])) }
+                }
             for (result in pool.invokeAll(tasks)) {
                 val (index, written) = result.get()
                 assertEquals(sequential[index], written)

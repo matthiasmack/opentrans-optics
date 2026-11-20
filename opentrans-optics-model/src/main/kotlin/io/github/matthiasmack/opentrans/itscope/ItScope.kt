@@ -53,30 +53,44 @@ object ItScopeRules {
      * A value that is too long is a [FacetViolationException], a missing value an
      * [IncompleteDocumentException] with the XML path in `element`.
      */
-    fun violations(order: Order): List<OpenTransException> = buildList {
-        val info = order.orderHeader.orderInfo
-        val idLength = info.orderId.codePointCount(0, info.orderId.length)
-        if (idLength > MAX_ORDER_ID_LENGTH) {
-            add(FacetViolationException("ORDER_INFO/ORDER_ID: at most $MAX_ORDER_ID_LENGTH characters for ITscope, got $idLength"))
-        }
-        for (party in info.parties) {
-            val role = listOf(PartyRole.BUYER, PartyRole.DELIVERY).firstOrNull { it in party.partyRoles } ?: continue
-            val address = party.addresses.firstOrNull()
-            for ((element, present) in addressFields(address)) {
-                if (!present) add(IncompleteDocumentException("PARTY/ADDRESS/$element", "ITscope needs $element in the address of the ${role.xml} party"))
+    fun violations(order: Order): List<OpenTransException> =
+        buildList {
+            val info = order.orderHeader.orderInfo
+            val idLength = info.orderId.codePointCount(0, info.orderId.length)
+            if (idLength > MAX_ORDER_ID_LENGTH) {
+                add(FacetViolationException("ORDER_INFO/ORDER_ID: at most $MAX_ORDER_ID_LENGTH characters for ITscope, got $idLength"))
+            }
+            for (party in info.parties) {
+                val role = listOf(PartyRole.BUYER, PartyRole.DELIVERY).firstOrNull { it in party.partyRoles } ?: continue
+                val address = party.addresses.firstOrNull()
+                for ((element, present) in addressFields(address)) {
+                    if (!present) {
+                        add(
+                            IncompleteDocumentException(
+                                "PARTY/ADDRESS/$element",
+                                "ITscope needs $element in the address of the ${role.xml} party",
+                            ),
+                        )
+                    }
+                }
+            }
+            for (item in order.orderItems) {
+                if (item.productId.supplierPid == null) {
+                    add(
+                        IncompleteDocumentException(
+                            "ORDER_ITEM/PRODUCT_ID/SUPPLIER_PID",
+                            "ITscope needs a SUPPLIER_PID for item ${item.lineItemId}",
+                        ),
+                    )
+                }
             }
         }
-        for (item in order.orderItems) {
-            if (item.productId.supplierPid == null) {
-                add(IncompleteDocumentException("ORDER_ITEM/PRODUCT_ID/SUPPLIER_PID", "ITscope needs a SUPPLIER_PID for item ${item.lineItemId}"))
-            }
-        }
-    }
 
-    private fun addressFields(address: Address?): List<Pair<String, Boolean>> = listOf(
-        "NAME" to (address?.names?.isNotEmpty() == true),
-        "STREET" to (address?.streets?.isNotEmpty() == true),
-        "ZIP" to (address?.zips?.isNotEmpty() == true),
-        "COUNTRY_CODED" to (address?.countryCoded != null || address?.countries?.isNotEmpty() == true),
-    )
+    private fun addressFields(address: Address?): List<Pair<String, Boolean>> =
+        listOf(
+            "NAME" to (address?.names?.isNotEmpty() == true),
+            "STREET" to (address?.streets?.isNotEmpty() == true),
+            "ZIP" to (address?.zips?.isNotEmpty() == true),
+            "COUNTRY_CODED" to (address?.countryCoded != null || address?.countries?.isNotEmpty() == true),
+        )
 }

@@ -18,10 +18,19 @@ const val BMECAT_NS = "http://www.bmecat.org/bmecat/2005"
 const val XSD_NS = "http://www.w3.org/2001/XMLSchema"
 const val XMLDSIG_NS = "http://www.w3.org/2000/09/xmldsig#"
 
-val DOCUMENT_ROOTS = listOf(
-    "RFQ", "QUOTATION", "ORDER", "ORDERCHANGE", "ORDERRESPONSE", "DISPATCHNOTIFICATION",
-    "RECEIPTACKNOWLEDGEMENT", "INVOICE", "INVOICELIST", "REMITTANCEADVICE",
-)
+val DOCUMENT_ROOTS =
+    listOf(
+        "RFQ",
+        "QUOTATION",
+        "ORDER",
+        "ORDERCHANGE",
+        "ORDERRESPONSE",
+        "DISPATCHNOTIFICATION",
+        "RECEIPTACKNOWLEDGEMENT",
+        "INVOICE",
+        "INVOICELIST",
+        "REMITTANCEADVICE",
+    )
 
 /**
  * Turns the XSModel into the [Ir]. The input is already resolved (references,
@@ -60,7 +69,9 @@ val DOCUMENT_ROOTS = listOf(
  * - **Facets** (length, pattern, allowed values, range, digits) -> checks in
  *   the generated `init` blocks.
  */
-class IrBuilder(private val model: XSModel) {
+class IrBuilder(
+    private val model: XSModel,
+) {
     private val typeNames = NameRegistry(Names.reserved + DOCUMENT_INTERFACE)
     private val classesByKey = mutableMapOf<QName, ClassDef>()
     private val wrappersByElement = mutableMapOf<QName, ClassDef>()
@@ -73,10 +84,11 @@ class IrBuilder(private val model: XSModel) {
     private val facetsByElement = mutableMapOf<QName, Facets>()
 
     fun build(): Ir {
-        val roots = DOCUMENT_ROOTS.map { name ->
-            val element = model.getElementDeclaration(name, OT_NS) ?: error("document root $name missing")
-            classForElement(element)
-        }
+        val roots =
+            DOCUMENT_ROOTS.map { name ->
+                val element = model.getElementDeclaration(name, OT_NS) ?: error("document root $name missing")
+                classForElement(element)
+            }
         while (pending.isNotEmpty()) pending.removeFirst().invoke()
         for (prop in classes.flatMap { it.props }) {
             val binding = prop.binding as? Binding.Element ?: continue
@@ -125,28 +137,57 @@ class IrBuilder(private val model: XSModel) {
         return base.takeIf { attributeNames(it) == attributeNames(t) }
     }
 
-    private fun newClass(name: String, origin: String, element: QName?) =
-        ClassDef(name, origin, element).also { classes += it }
+    private fun newClass(
+        name: String,
+        origin: String,
+        element: QName?,
+    ) = ClassDef(name, origin, element).also { classes += it }
 
-    private fun fill(cls: ClassDef, t: XSComplexTypeDefinition) {
+    private fun fill(
+        cls: ClassDef,
+        t: XSComplexTypeDefinition,
+    ) {
         val props = NameRegistry()
         var choiceCount = 0
 
-        fun addProp(defaultName: String, type: KType, card: Card, binding: Binding) {
+        fun addProp(
+            defaultName: String,
+            type: KType,
+            card: Card,
+            binding: Binding,
+        ) {
             val name = Names.property(cls.name, defaultName)
             cls.props += Prop(props.claim(name), type, card, binding)
         }
 
-        fun walk(p: XSParticle, forcedOptional: Boolean) {
+        fun walk(
+            p: XSParticle,
+            forcedOptional: Boolean,
+        ) {
             when (val term = p.term) {
-                is XSElementDeclaration -> addElement(p, term, forcedOptional, ::addProp)
-                is XSModelGroup -> when {
-                    term.compositor == XSModelGroup.COMPOSITOR_CHOICE ->
-                        addChoice(cls, p, term, ++choiceCount, forcedOptional, ::addProp)
-                    p.repeated -> addRepeatedGroup(cls, p, term, ::addProp)
-                    else -> term.particleList.forEach { walk(it, forcedOptional || p.minOccurs == 0) }
+                is XSElementDeclaration -> {
+                    addElement(p, term, forcedOptional, ::addProp)
                 }
-                is XSWildcard -> error("wildcard in ${cls.origin} should have been mapped to XmlContent")
+
+                is XSModelGroup -> {
+                    when {
+                        term.compositor == XSModelGroup.COMPOSITOR_CHOICE -> {
+                            addChoice(cls, p, term, ++choiceCount, forcedOptional, ::addProp)
+                        }
+
+                        p.repeated -> {
+                            addRepeatedGroup(cls, p, term, ::addProp)
+                        }
+
+                        else -> {
+                            term.particleList.forEach { walk(it, forcedOptional || p.minOccurs == 0) }
+                        }
+                    }
+                }
+
+                is XSWildcard -> {
+                    error("wildcard in ${cls.origin} should have been mapped to XmlContent")
+                }
             }
         }
 
@@ -155,9 +196,18 @@ class IrBuilder(private val model: XSModel) {
                 addProp("value", simpleType(t.simpleType, cls.name + "Value", "${cls.origin} content"), Card.Required, Binding.Text)
                 cls.props.last().facets = facets(t.simpleType)
             }
-            XSComplexTypeDefinition.CONTENTTYPE_ELEMENT -> walk(t.particle, false)
-            XSComplexTypeDefinition.CONTENTTYPE_EMPTY -> Unit
-            else -> error("mixed content in ${cls.origin} should have been mapped to XmlContent")
+
+            XSComplexTypeDefinition.CONTENTTYPE_ELEMENT -> {
+                walk(t.particle, false)
+            }
+
+            XSComplexTypeDefinition.CONTENTTYPE_EMPTY -> {
+                // attributes only, no content
+            }
+
+            else -> {
+                error("mixed content in ${cls.origin} should have been mapped to XmlContent")
+            }
         }
 
         for (use in t.attributeUseList) {
@@ -167,39 +217,64 @@ class IrBuilder(private val model: XSModel) {
                 continue
             }
             // A required attribute with exactly one allowed value (version="2.1") is fixed in practice.
-            val only = decl.typeDefinition.lexicalEnumeration.takeIf { it.length == 1 }?.item(0)
+            val only =
+                decl.typeDefinition.lexicalEnumeration
+                    .takeIf { it.length == 1 }
+                    ?.item(0)
             if (use.required && only != null) {
                 cls.fixedAttributes[decl.name] = only
                 continue
             }
             val type = simpleType(decl.typeDefinition, cls.name + Names.className(decl.name), "${cls.origin}/@${decl.name}")
-            addProp(Names.propertyName(decl.name), type, if (use.required) Card.Required else Card.Optional, Binding.Attribute(decl.name, decl.namespace?.takeIf { it.isNotEmpty() }))
+            addProp(
+                Names.propertyName(
+                    decl.name,
+                ),
+                type,
+                if (use.required) Card.Required else Card.Optional,
+                Binding.Attribute(
+                    decl.name,
+                    decl.namespace?.takeIf {
+                        it.isNotEmpty()
+                    },
+                ),
+            )
             cls.props.last().facets = facets(decl.typeDefinition)
         }
     }
 
     private fun addElement(
-        p: XSParticle, e: XSElementDeclaration, forcedOptional: Boolean,
+        p: XSParticle,
+        e: XSElementDeclaration,
+        forcedOptional: Boolean,
         addProp: (String, KType, Card, Binding) -> Unit,
     ) {
         val wrapped = wrappedChild(e)
         if (wrapped != null && !p.repeated) {
             val (childParticle, child) = wrapped
             val min = if (p.minOccurs == 0 || forcedOptional) 0 else childParticle.minOccurs
-            addProp(Names.plural(Names.propertyName(child.name)), elementType(child), Card.Many(min), Binding.Element(child.qname, wrapper = e.qname))
+            addProp(
+                Names.plural(Names.propertyName(child.name)),
+                elementType(child),
+                Card.Many(min),
+                Binding.Element(child.qname, wrapper = e.qname),
+            )
             return
         }
-        val card = when {
-            p.repeated -> Card.Many(if (forcedOptional) 0 else p.minOccurs)
-            p.minOccurs == 0 || forcedOptional -> Card.Optional
-            else -> Card.Required
-        }
+        val card =
+            when {
+                p.repeated -> Card.Many(if (forcedOptional) 0 else p.minOccurs)
+                p.minOccurs == 0 || forcedOptional -> Card.Optional
+                else -> Card.Required
+            }
         val name = Names.propertyName(e.name).let { if (card is Card.Many) Names.plural(it) else it }
         addProp(name, elementType(e), card, Binding.Element(e.qname))
     }
 
     private fun addRepeatedGroup(
-        owner: ClassDef, p: XSParticle, group: XSModelGroup,
+        owner: ClassDef,
+        p: XSParticle,
+        group: XSModelGroup,
         addProp: (String, KType, Card, Binding) -> Unit,
     ) {
         val first = group.firstElement() ?: error("empty repeated group in ${owner.origin}")
@@ -209,20 +284,32 @@ class IrBuilder(private val model: XSModel) {
     }
 
     private fun addChoice(
-        owner: ClassDef, p: XSParticle, group: XSModelGroup, index: Int, forcedOptional: Boolean,
+        owner: ClassDef,
+        p: XSParticle,
+        group: XSModelGroup,
+        index: Int,
+        forcedOptional: Boolean,
         addProp: (String, KType, Card, Binding) -> Unit,
     ) {
         val key = "${owner.origin}#$index"
         val choice = ChoiceDef(typeNames.claim(Names.classOverride(key) ?: (owner.name + "Choice")), key).also { choices += it }
         val alternatives = group.particleList
-        val directCandidates = alternatives.mapNotNull { (it.term as? XSElementDeclaration)?.takeIf { _ -> !it.repeated } }
-            .map { elementType(it) }.filterIsInstance<KType.Class>().groupingBy { it.def }.eachCount()
+        val directCandidates =
+            alternatives
+                .mapNotNull { (it.term as? XSElementDeclaration)?.takeIf { _ -> !it.repeated } }
+                .map { elementType(it) }
+                .filterIsInstance<KType.Class>()
+                .groupingBy { it.def }
+                .eachCount()
 
         var anyOptionalAlternative = false
         for (alt in alternatives) {
             if (alt.minOccurs == 0) anyOptionalAlternative = true
             when (val term = alt.term) {
-                is XSElementDeclaration -> choice.variants += elementVariant(choice, alt, term, directCandidates)
+                is XSElementDeclaration -> {
+                    choice.variants += elementVariant(choice, alt, term, directCandidates)
+                }
+
                 is XSModelGroup -> {
                     val first = term.firstElement() ?: error("empty sequence in choice $key")
                     val origin = "$key/${first.name}..."
@@ -232,30 +319,44 @@ class IrBuilder(private val model: XSModel) {
                     pending += { fillFromGroup(cls, term) }
                     choice.variants += Variant(cls, VariantKind.Sequence)
                 }
-                is XSWildcard -> error("wildcard in choice $key")
+
+                is XSWildcard -> {
+                    error("wildcard in choice $key")
+                }
             }
         }
 
-        val card = when {
-            p.repeated -> Card.Many(p.minOccurs)
-            p.minOccurs == 0 || forcedOptional || anyOptionalAlternative -> Card.Optional
-            else -> Card.Required
-        }
+        val card =
+            when {
+                p.repeated -> Card.Many(p.minOccurs)
+                p.minOccurs == 0 || forcedOptional || anyOptionalAlternative -> Card.Optional
+                else -> Card.Required
+            }
         addProp(choice.name.replaceFirstChar(Char::lowercase), KType.Choice(choice), card, Binding.Choice)
     }
 
     private fun elementVariant(
-        choice: ChoiceDef, alt: XSParticle, e: XSElementDeclaration, directCandidates: Map<ClassDef, Int>,
+        choice: ChoiceDef,
+        alt: XSParticle,
+        e: XSElementDeclaration,
+        directCandidates: Map<ClassDef, Int>,
     ): Variant {
         val type = elementType(e)
         if (alt.repeated) {
-            val cls = repeatedVariantsByElement.getOrPut(e.qname) {
-                val singular = Names.className(e.name)
-                val plural = Names.plural(singular).let { if (it == singular) "${singular}List" else it }
-                newClass(typeNames.claim(Names.classOverride("${e.name}+") ?: plural), "${e.name}+", null).also {
-                    it.props += Prop(Names.plural(Names.propertyName(e.name)), type, Card.Many(maxOf(alt.minOccurs, 1)), Binding.Element(e.qname))
+            val cls =
+                repeatedVariantsByElement.getOrPut(e.qname) {
+                    val singular = Names.className(e.name)
+                    val plural = Names.plural(singular).let { if (it == singular) "${singular}List" else it }
+                    newClass(typeNames.claim(Names.classOverride("${e.name}+") ?: plural), "${e.name}+", null).also {
+                        it.props +=
+                            Prop(
+                                Names.plural(Names.propertyName(e.name)),
+                                type,
+                                Card.Many(maxOf(alt.minOccurs, 1)),
+                                Binding.Element(e.qname),
+                            )
+                    }
                 }
-            }
             cls.implements += choice
             return Variant(cls, VariantKind.Repeated(e.qname))
         }
@@ -263,20 +364,27 @@ class IrBuilder(private val model: XSModel) {
             type.def.implements += choice
             return Variant(type.def, VariantKind.Direct(e.qname))
         }
-        val wrapper = wrappersByElement.getOrPut(e.qname) {
-            newClass(typeNames.claim(Names.className(e.name)), e.name, null).also {
-                it.props += Prop("value", type, Card.Required, Binding.Element(e.qname))
+        val wrapper =
+            wrappersByElement.getOrPut(e.qname) {
+                newClass(typeNames.claim(Names.className(e.name)), e.name, null).also {
+                    it.props += Prop("value", type, Card.Required, Binding.Element(e.qname))
+                }
             }
-        }
         wrapper.implements += choice
         return Variant(wrapper, VariantKind.Wrapped(e.qname))
     }
 
-    private fun fillFromGroup(cls: ClassDef, group: XSModelGroup) {
+    private fun fillFromGroup(
+        cls: ClassDef,
+        group: XSModelGroup,
+    ) {
         val props = NameRegistry()
         for (p in group.particleList) {
             val e = p.term as? XSElementDeclaration ?: error("nested group inside ${cls.origin} is not supported")
-            addElement(p, e, false) { name, type, card, binding -> cls.props += Prop(props.claim(Names.property(cls.name, name)), type, card, binding) }
+            addElement(p, e, false) { name, type, card, binding ->
+                cls.props +=
+                    Prop(props.claim(Names.property(cls.name, name)), type, card, binding)
+            }
         }
     }
 
@@ -290,52 +398,83 @@ class IrBuilder(private val model: XSModel) {
     /** Facets of an element's value: its simple type, or the simple content of a reused class. */
     private fun recordFacets(e: XSElementDeclaration) {
         if (e.qname in facetsByElement) return
-        val f = when (val t = e.typeDefinition) {
-            is XSSimpleTypeDefinition -> facets(t)
-            is XSComplexTypeDefinition -> when {
-                t.contentType != XSComplexTypeDefinition.CONTENTTYPE_SIMPLE -> null
-                t.attributeUses.length == 0 || (t.anonymous && reusableBase(t) != null) -> facets(t.simpleType)
-                else -> null
+        val f =
+            when (val t = e.typeDefinition) {
+                is XSSimpleTypeDefinition -> {
+                    facets(t)
+                }
+
+                is XSComplexTypeDefinition -> {
+                    when {
+                        t.contentType != XSComplexTypeDefinition.CONTENTTYPE_SIMPLE -> null
+                        t.attributeUses.length == 0 || (t.anonymous && reusableBase(t) != null) -> facets(t.simpleType)
+                        else -> null
+                    }
+                }
+
+                else -> {
+                    null
+                }
             }
-            else -> null
-        }
         facetsByElement[e.qname] = f ?: Facets()
     }
 
     private fun facets(t: XSSimpleTypeDefinition?): Facets? {
         if (t == null || t.variety != XSSimpleTypeDefinition.VARIETY_ATOMIC) return null
+
         fun value(facet: Short) = t.getLexicalFacetValue(facet)
         val patterns = (0 until t.lexicalPattern.length).map { t.lexicalPattern.item(it) }
         val enumeration = (0 until t.lexicalEnumeration.length).map { t.lexicalEnumeration.item(it) }
-        val f = Facets(
-            minLength = (value(XSSimpleTypeDefinition.FACET_MINLENGTH) ?: value(XSSimpleTypeDefinition.FACET_LENGTH))?.toInt(),
-            maxLength = (value(XSSimpleTypeDefinition.FACET_MAXLENGTH) ?: value(XSSimpleTypeDefinition.FACET_LENGTH))?.toInt(),
-            patterns = patterns,
-            enumeration = enumeration,
-            minInclusive = value(XSSimpleTypeDefinition.FACET_MININCLUSIVE),
-            maxInclusive = value(XSSimpleTypeDefinition.FACET_MAXINCLUSIVE),
-            minExclusive = value(XSSimpleTypeDefinition.FACET_MINEXCLUSIVE),
-            maxExclusive = value(XSSimpleTypeDefinition.FACET_MAXEXCLUSIVE),
-            totalDigits = value(XSSimpleTypeDefinition.FACET_TOTALDIGITS)?.toInt(),
-            fractionDigits = value(XSSimpleTypeDefinition.FACET_FRACTIONDIGITS)?.toInt(),
-        )
+        val f =
+            Facets(
+                minLength = (value(XSSimpleTypeDefinition.FACET_MINLENGTH) ?: value(XSSimpleTypeDefinition.FACET_LENGTH))?.toInt(),
+                maxLength = (value(XSSimpleTypeDefinition.FACET_MAXLENGTH) ?: value(XSSimpleTypeDefinition.FACET_LENGTH))?.toInt(),
+                patterns = patterns,
+                enumeration = enumeration,
+                minInclusive = value(XSSimpleTypeDefinition.FACET_MININCLUSIVE),
+                maxInclusive = value(XSSimpleTypeDefinition.FACET_MAXINCLUSIVE),
+                minExclusive = value(XSSimpleTypeDefinition.FACET_MINEXCLUSIVE),
+                maxExclusive = value(XSSimpleTypeDefinition.FACET_MAXEXCLUSIVE),
+                totalDigits = value(XSSimpleTypeDefinition.FACET_TOTALDIGITS)?.toInt(),
+                fractionDigits = value(XSSimpleTypeDefinition.FACET_FRACTIONDIGITS)?.toInt(),
+            )
         return f.takeUnless { it.isEmpty }
     }
 
-    private fun elementTypeOf(e: XSElementDeclaration): KType = when (val t = e.typeDefinition) {
-        is XSSimpleTypeDefinition -> simpleType(t, elementBaseName(e), e.name)
-        is XSComplexTypeDefinition -> when {
-            isRaw(t) -> KType.Raw
-            t.contentType == XSComplexTypeDefinition.CONTENTTYPE_SIMPLE && t.attributeUses.length == 0 ->
-                simpleType(t.simpleType, elementBaseName(e), e.name)
-            else -> KType.Class(classForElement(e))
+    private fun elementTypeOf(e: XSElementDeclaration): KType =
+        when (val t = e.typeDefinition) {
+            is XSSimpleTypeDefinition -> {
+                simpleType(t, elementBaseName(e), e.name)
+            }
+
+            is XSComplexTypeDefinition -> {
+                when {
+                    isRaw(t) -> {
+                        KType.Raw
+                    }
+
+                    t.contentType == XSComplexTypeDefinition.CONTENTTYPE_SIMPLE && t.attributeUses.length == 0 -> {
+                        simpleType(t.simpleType, elementBaseName(e), e.name)
+                    }
+
+                    else -> {
+                        KType.Class(classForElement(e))
+                    }
+                }
+            }
+
+            else -> {
+                error("unexpected type for ${e.name}")
+            }
         }
-        else -> error("unexpected type for ${e.name}")
-    }
 
     private fun enumValues(t: XSSimpleTypeDefinition) = (0 until t.lexicalEnumeration.length).map { t.lexicalEnumeration.item(it) }
 
-    private fun simpleType(t: XSSimpleTypeDefinition, enumName: String, origin: String): KType {
+    private fun simpleType(
+        t: XSSimpleTypeDefinition,
+        enumName: String,
+        origin: String,
+    ): KType {
         if (t.variety != XSSimpleTypeDefinition.VARIETY_ATOMIC) return KType.Scalar(ScalarKind.STRING)
         val chain = generateSequence<XSTypeDefinition>(t) { it.baseType?.takeIf { b -> b !== it } }.toList()
         val names = chain.mapNotNull { it.name?.let { n -> it.namespace to n } }
@@ -346,10 +485,12 @@ class IrBuilder(private val model: XSModel) {
             // An anonymous restriction that keeps the values of a named enumeration reuses that enum.
             val named = chain.filterIsInstance<XSSimpleTypeDefinition>().firstOrNull { !it.anonymous && enumValues(it) == values }
             val key = named ?: t
-            return KType.Enum(enumsByType.getOrPut(key) {
-                val (name, from) = if (named != null) Names.className(named.name) to named.name else enumName to origin
-                EnumDef(typeNames.claim(Names.classOverride(from) ?: name), from, values).also { enums += it }
-            })
+            return KType.Enum(
+                enumsByType.getOrPut(key) {
+                    val (name, from) = if (named != null) Names.className(named.name) to named.name else enumName to origin
+                    EnumDef(typeNames.claim(Names.classOverride(from) ?: name), from, values).also { enums += it }
+                },
+            )
         }
         if (names.any { it == (BMECAT_NS to "dtDATETIME") }) return KType.Scalar(ScalarKind.DATETIME)
         // dtBOOLEAN exists in both namespaces ("true"/"false" in any case).
@@ -358,9 +499,13 @@ class IrBuilder(private val model: XSModel) {
         return KType.Scalar(
             when (builtin) {
                 "integer", "int", "long", "short", "byte", "nonNegativeInteger", "positiveInteger",
-                "nonPositiveInteger", "negativeInteger", "unsignedInt", "unsignedLong", "unsignedShort" -> ScalarKind.INT
+                "nonPositiveInteger", "negativeInteger", "unsignedInt", "unsignedLong", "unsignedShort",
+                -> ScalarKind.INT
+
                 "decimal", "float", "double" -> ScalarKind.DECIMAL
+
                 "boolean" -> ScalarKind.BOOLEAN
+
                 else -> ScalarKind.STRING
             },
         )
@@ -369,12 +514,14 @@ class IrBuilder(private val model: XSModel) {
     /** Content we keep as raw XML: wildcards, mixed content, or the xmldsig signature. */
     private fun isRaw(t: XSComplexTypeDefinition): Boolean {
         if (t.contentType == XSComplexTypeDefinition.CONTENTTYPE_MIXED) return true
-        fun containsRaw(p: XSParticle): Boolean = when (val term = p.term) {
-            is XSWildcard -> true
-            is XSElementDeclaration -> term.namespace == XMLDSIG_NS
-            is XSModelGroup -> term.particleList.any(::containsRaw)
-            else -> false
-        }
+
+        fun containsRaw(p: XSParticle): Boolean =
+            when (val term = p.term) {
+                is XSWildcard -> true
+                is XSElementDeclaration -> term.namespace == XMLDSIG_NS
+                is XSModelGroup -> term.particleList.any(::containsRaw)
+                else -> false
+            }
         return t.particle?.let(::containsRaw) ?: false
     }
 
@@ -396,10 +543,11 @@ private val XSParticle.repeated get() = maxOccursUnbounded || maxOccurs > 1
 private val XSModelGroup.particleList get() = (0 until particles.length).map { particles.item(it) as XSParticle }
 private val XSComplexTypeDefinition.attributeUseList get() = (0 until attributeUses.length).map { attributeUses.item(it) as XSAttributeUse }
 
-private fun XSModelGroup.firstElement(): XSElementDeclaration? = particleList.firstNotNullOfOrNull {
-    when (val term = it.term) {
-        is XSElementDeclaration -> term
-        is XSModelGroup -> term.firstElement()
-        else -> null
+private fun XSModelGroup.firstElement(): XSElementDeclaration? =
+    particleList.firstNotNullOfOrNull {
+        when (val term = it.term) {
+            is XSElementDeclaration -> term
+            is XSModelGroup -> term.firstElement()
+            else -> null
+        }
     }
-}

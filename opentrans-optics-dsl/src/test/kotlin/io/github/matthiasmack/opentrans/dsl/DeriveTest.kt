@@ -1,7 +1,7 @@
 package io.github.matthiasmack.opentrans.dsl
 
-import io.github.matthiasmack.opentrans.model.IncompleteDocumentException
 import io.github.matthiasmack.opentrans.model.DispatchNotification
+import io.github.matthiasmack.opentrans.model.IncompleteDocumentException
 import io.github.matthiasmack.opentrans.model.Invoice
 import io.github.matthiasmack.opentrans.model.OrderResponse
 import io.github.matthiasmack.opentrans.model.spikeOrder
@@ -14,7 +14,6 @@ import kotlin.test.assertFailsWith
 
 /** Follow-up documents derived from an ORDER are valid openTRANS and carry the order's data. */
 class DeriveTest {
-
     private inline fun <reified T : io.github.matthiasmack.opentrans.model.OpenTransDocument> roundTrip(document: T): T =
         OpenTransXml.readAs<T>(OpenTransXml.write(document)).also { assertEquals(document, it) }
 
@@ -32,9 +31,10 @@ class DeriveTest {
 
     @Test
     fun `order response can be adjusted in the block`() {
-        val response = spikeOrder.toOrderResponse(date = "2026-11-18") {
-            orderResponseItems[1] = orderResponseItems[1].copy(quantity = BigDecimal("2"))
-        }
+        val response =
+            spikeOrder.toOrderResponse(date = "2026-11-18") {
+                orderResponseItems[1] = orderResponseItems[1].copy(quantity = BigDecimal("2"))
+            }
         assertEquals(BigDecimal("2"), roundTrip(response).orderResponseItems[1].quantity)
     }
 
@@ -51,7 +51,8 @@ class DeriveTest {
 
     @Test
     fun `dispatch notification for a partial delivery`() {
-        val dispatch = roundTrip(spikeOrder.toDispatchNotification(id = "DN-2", date = "2026-11-24", quantities = mapOf("1" to 40, "2" to 0)))
+        val dispatch =
+            roundTrip(spikeOrder.toDispatchNotification(id = "DN-2", date = "2026-11-24", quantities = mapOf("1" to 40, "2" to 0)))
 
         assertEquals(listOf("1"), dispatch.dispatchNotificationItems.map { it.lineItemId })
         assertEquals(BigDecimal.valueOf(40), dispatch.dispatchNotificationItems.single().quantity)
@@ -76,7 +77,10 @@ class DeriveTest {
 
     @Test
     fun `invoice needs prices and a currency`() {
-        val noCurrency = spikeOrder.copy(orderHeader = spikeOrder.orderHeader.copy(orderInfo = spikeOrder.orderHeader.orderInfo.copy(currency = null)))
+        val noCurrency =
+            spikeOrder.copy(
+                orderHeader = spikeOrder.orderHeader.copy(orderInfo = spikeOrder.orderHeader.orderInfo.copy(currency = null)),
+            )
         val noCurrencyError = assertFailsWith<IncompleteDocumentException> { noCurrency.toInvoice("I", "2026-11-30", "0.19") }
         assertEquals("The order has no CURRENCY; an invoice needs one", noCurrencyError.message)
         assertEquals("ORDER_INFO/CURRENCY", noCurrencyError.element)
@@ -89,7 +93,13 @@ class DeriveTest {
     fun `all three follow-up documents are different document types`() {
         assertEquals(
             listOf(OrderResponse::class, DispatchNotification::class, Invoice::class),
-            listOf(spikeOrder.toOrderResponse("2026-11-18"), spikeOrder.toDispatchNotification("DN", "2026-11-24"), spikeOrder.toInvoice("I", "2026-11-30", "0.19")).map { it::class },
+            listOf(
+                spikeOrder.toOrderResponse("2026-11-18"),
+                spikeOrder.toDispatchNotification("DN", "2026-11-24"),
+                spikeOrder.toInvoice("I", "2026-11-30", "0.19"),
+            ).map {
+                it::class
+            },
         )
     }
 }

@@ -40,10 +40,16 @@ fun <T> XmlContent.getAll(type: UdxType<T>): List<T> = elements.filter { it.name
  * This content with [value] as the element of [type]: replaces an existing one
  * in place (any further ones are removed), appends it otherwise; null removes it.
  */
-fun <T> XmlContent.with(type: UdxType<T>, value: T?): XmlContent = withAll(type, listOfNotNull(value))
+fun <T> XmlContent.with(
+    type: UdxType<T>,
+    value: T?,
+): XmlContent = withAll(type, listOfNotNull(value))
 
 /** This content with exactly [values] as the elements of [type], at the place of the first existing one. */
-fun <T> XmlContent.withAll(type: UdxType<T>, values: List<T>): XmlContent {
+fun <T> XmlContent.withAll(
+    type: UdxType<T>,
+    values: List<T>,
+): XmlContent {
     val written = values.map(type::write)
     val isType = { node: XmlNode -> node is XmlElement && node.name == type.name }
     val first = nodes.indexOfFirst(isType)
@@ -55,10 +61,11 @@ fun <T> XmlContent.withAll(type: UdxType<T>, values: List<T>): XmlContent {
  * Optic from UDX content to the value of [type]. Absent when the content or
  * the element is missing; `set` creates both if needed.
  */
-fun <T> UdxType<T>.optic(): Optional<XmlContent?, T> = Optional(
-    getOption = { content -> Option.fromNullable(content?.get(this)) },
-    set = { content, value -> (content ?: XmlContent.EMPTY).with(this, value) },
-)
+fun <T> UdxType<T>.optic(): Optional<XmlContent?, T> =
+    Optional(
+        getOption = { content -> Option.fromNullable(content?.get(this)) },
+        set = { content, value -> (content ?: XmlContent.EMPTY).with(this, value) },
+    )
 
 /** Focus on a typed UDX inside a UDX property: `Order.orderHeader.orderInfo.headerUdx.udx(ProjectInfoUdx)`. */
 fun <S, T> Optional<S, XmlContent?>.udx(type: UdxType<T>): Optional<S, T> = this compose type.optic()

@@ -22,10 +22,19 @@ import java.io.File
  */
 
 private const val OT = "http://www.opentrans.org/XMLSchema/2.1"
-private val ROOTS = listOf(
-    "RFQ", "QUOTATION", "ORDER", "ORDERCHANGE", "ORDERRESPONSE", "DISPATCHNOTIFICATION",
-    "RECEIPTACKNOWLEDGEMENT", "INVOICE", "INVOICELIST", "REMITTANCEADVICE",
-)
+private val ROOTS =
+    listOf(
+        "RFQ",
+        "QUOTATION",
+        "ORDER",
+        "ORDERCHANGE",
+        "ORDERRESPONSE",
+        "DISPATCHNOTIFICATION",
+        "RECEIPTACKNOWLEDGEMENT",
+        "INVOICE",
+        "INVOICELIST",
+        "REMITTANCEADVICE",
+    )
 
 fun main(args: Array<String>) {
     val model = SchemaLoader.load(File(args.single()))
@@ -33,9 +42,13 @@ fun main(args: Array<String>) {
     val seenElements = mutableSetOf<String>()
     val seenTypes = mutableSetOf<String>()
 
-    fun key(e: XSElementDeclaration) = "{${e.namespace}}${e.name}#${e.typeDefinition.name ?: "anon@" + System.identityHashCode(e.typeDefinition)}"
+    fun key(e: XSElementDeclaration) =
+        "{${e.namespace}}${e.name}#${e.typeDefinition.name ?: "anon@" + System.identityHashCode(e.typeDefinition)}"
 
-    fun visitType(t: XSTypeDefinition, owner: String) {
+    fun visitType(
+        t: XSTypeDefinition,
+        owner: String,
+    ) {
         val typeKey = t.name?.let { "{${t.namespace}}$it" } ?: "anon:$owner"
         if (!seenTypes.add(typeKey)) return
         if (t is XSSimpleTypeDefinition) {
@@ -46,7 +59,12 @@ fun main(args: Array<String>) {
         if (t.name == "anyType") return
         stats.complexType(t, owner)
         val particle = t.particle ?: return
-        fun walk(p: XSParticle, depth: Int, inChoice: Boolean) {
+
+        fun walk(
+            p: XSParticle,
+            depth: Int,
+            inChoice: Boolean,
+        ) {
             val term: XSTerm = p.term
             when (term) {
                 is XSElementDeclaration -> {
@@ -56,12 +74,22 @@ fun main(args: Array<String>) {
                         visitType(term.typeDefinition, term.name)
                     }
                 }
+
                 is XSModelGroup -> {
                     stats.group(term, p, depth, inChoice)
                     val parts = term.particles
-                    for (i in 0 until parts.length) walk(parts.item(i) as XSParticle, depth + 1, inChoice || term.compositor == XSModelGroup.COMPOSITOR_CHOICE)
+                    for (i in 0 until parts.length) {
+                        walk(
+                            parts.item(i) as XSParticle,
+                            depth + 1,
+                            inChoice || term.compositor == XSModelGroup.COMPOSITOR_CHOICE,
+                        )
+                    }
                 }
-                is XSWildcard -> stats.wildcards += owner
+
+                is XSWildcard -> {
+                    stats.wildcards += owner
+                }
             }
         }
         walk(particle, 0, false)
@@ -106,10 +134,17 @@ private class Stats {
         elements++
         val t = e.typeDefinition
         if (t is XSSimpleTypeDefinition) simpleElements++
-        if (t.name == "anyType" || (t is XSComplexTypeDefinition && t.baseType?.name == "anyType" && t.particle?.term is XSWildcard)) anyTypeElements += e.name
+        if (t.name == "anyType" ||
+            (t is XSComplexTypeDefinition && t.baseType?.name == "anyType" && t.particle?.term is XSWildcard)
+        ) {
+            anyTypeElements += e.name
+        }
     }
 
-    fun elementUse(p: XSParticle, inChoice: Boolean) {
+    fun elementUse(
+        p: XSParticle,
+        inChoice: Boolean,
+    ) {
         when {
             p.maxOccursUnbounded || p.maxOccurs > 1 -> listUses++
             p.minOccurs == 0 -> optionalUses++
@@ -117,7 +152,12 @@ private class Stats {
         }
     }
 
-    fun group(g: XSModelGroup, p: XSParticle, depth: Int, inChoice: Boolean) {
+    fun group(
+        g: XSModelGroup,
+        p: XSParticle,
+        depth: Int,
+        inChoice: Boolean,
+    ) {
         if (p.maxOccursUnbounded || p.maxOccurs > 1) repeatedGroups++
         if (g.compositor == XSModelGroup.COMPOSITOR_SEQUENCE && depth > 0 && !inChoice) sequencesInSequence++
         if (g.compositor != XSModelGroup.COMPOSITOR_CHOICE) return
@@ -132,14 +172,18 @@ private class Stats {
         }
     }
 
-    fun complexType(t: XSComplexTypeDefinition, owner: String) {
-        val content = when (t.contentType) {
-            CONTENTTYPE_EMPTY -> "empty"
-            CONTENTTYPE_SIMPLE -> "simple"
-            CONTENTTYPE_ELEMENT -> "element"
-            CONTENTTYPE_MIXED -> "mixed"
-            else -> "?"
-        }
+    fun complexType(
+        t: XSComplexTypeDefinition,
+        owner: String,
+    ) {
+        val content =
+            when (t.contentType) {
+                CONTENTTYPE_EMPTY -> "empty"
+                CONTENTTYPE_SIMPLE -> "simple"
+                CONTENTTYPE_ELEMENT -> "element"
+                CONTENTTYPE_MIXED -> "mixed"
+                else -> "?"
+            }
         complexByContent.merge(content, 1, Int::plus)
         if (t.contentType == CONTENTTYPE_MIXED) mixed += owner
         if (t.name != null) namedComplexTypes += t.name else anonymousComplexTypes++
@@ -174,8 +218,10 @@ private class Stats {
         println("  anonymous complex types: $anonymousComplexTypes")
         println("attributes: $attributes (required: $requiredAttributes)")
         println("element uses: required=$requiredUses optional=$optionalUses repeated=$listUses")
-        println("choices: $choices (nested: $nestedChoices, optional: $optionalChoices, " +
-            "repeated alternative: $choicesWithRepeatedAlternative, sequence alternative: $choicesWithSequenceAlternative)")
+        println(
+            "choices: $choices (nested: $nestedChoices, optional: $optionalChoices, " +
+                "repeated alternative: $choicesWithRepeatedAlternative, sequence alternative: $choicesWithSequenceAlternative)",
+        )
         println("repeated groups (sequence/choice with maxOccurs>1): $repeatedGroups")
         println("sequences nested in sequences: $sequencesInSequence")
         println("wrapper elements (one repeated child, no attributes): ${wrappers.size}")

@@ -17,22 +17,26 @@ dependencies {
     codegen(project(":codegen"))
 }
 
-val schemaDir = rootProject.layout.projectDirectory.dir("opentrans-optics-xml/src/main/resources/io/github/matthiasmack/opentrans/xsd/itscope")
+val schemaDir =
+    rootProject.layout.projectDirectory.dir(
+        "opentrans-optics-xml/src/main/resources/io/github/matthiasmack/opentrans/xsd/itscope",
+    )
 val generatedDir = layout.buildDirectory.dir("generated/opentrans/kotlin")
 
-val generateModel = tasks.register<JavaExec>("generateModel") {
-    description = "Generates the openTRANS model classes from the XSD."
-    classpath = codegen
-    mainClass = "io.github.matthiasmack.opentrans.codegen.GenerateKt"
-    inputs.dir(schemaDir)
-    outputs.dir(generatedDir)
-    args(
-        "model",
-        schemaDir.file("opentrans_2_1.xsd").asFile.absolutePath,
-        generatedDir.get().asFile.absolutePath,
-        "io.github.matthiasmack.opentrans.model",
-    )
-}
+val generateModel =
+    tasks.register<JavaExec>("generateModel") {
+        description = "Generates the openTRANS model classes from the XSD."
+        classpath = codegen
+        mainClass = "io.github.matthiasmack.opentrans.codegen.GenerateKt"
+        inputs.dir(schemaDir)
+        outputs.dir(generatedDir)
+        args(
+            "model",
+            schemaDir.file("opentrans_2_1.xsd").asFile.absolutePath,
+            generatedDir.get().asFile.absolutePath,
+            "io.github.matthiasmack.opentrans.model",
+        )
+    }
 
 kotlin.sourceSets.main {
     kotlin.srcDir(generateModel)

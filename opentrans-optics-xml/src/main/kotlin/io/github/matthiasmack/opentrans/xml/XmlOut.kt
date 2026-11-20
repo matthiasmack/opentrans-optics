@@ -24,11 +24,17 @@ internal class XmlOut {
     private var namespacesPending = false
 
     private fun rootNamespaces(): Array<Pair<String, String?>> =
-        if (namespacesPending) arrayOf<Pair<String, String?>>("xmlns" to OT, "xmlns:bmecat" to BMECAT).also { namespacesPending = false }
-        else emptyArray()
+        if (namespacesPending) {
+            arrayOf<Pair<String, String?>>("xmlns" to OT, "xmlns:bmecat" to BMECAT).also { namespacesPending = false }
+        } else {
+            emptyArray()
+        }
 
     /** Element without content. */
-    fun empty(name: String, vararg attributes: Pair<String, String?>) {
+    fun empty(
+        name: String,
+        vararg attributes: Pair<String, String?>,
+    ) {
         indent()
         out.append('<').append(name)
         attributes(rootNamespaces())
@@ -37,7 +43,11 @@ internal class XmlOut {
     }
 
     /** Element with element-only content. */
-    fun element(name: String, vararg attributes: Pair<String, String?>, content: XmlOut.() -> Unit) {
+    fun element(
+        name: String,
+        vararg attributes: Pair<String, String?>,
+        content: XmlOut.() -> Unit,
+    ) {
         indent()
         out.append('<').append(name)
         attributes(rootNamespaces())
@@ -51,19 +61,38 @@ internal class XmlOut {
     }
 
     /** Element with simple content; skipped when [value] is null. */
-    fun text(name: String, value: String?, vararg attributes: Pair<String, String?>) {
+    fun text(
+        name: String,
+        value: String?,
+        vararg attributes: Pair<String, String?>,
+    ) {
         if (value == null) return
         indent()
         out.append('<').append(name)
         attributes(attributes)
-        out.append('>').append(escape(value, attribute = false)).append("</").append(name).append(">\n")
+        out
+            .append('>')
+            .append(escape(value, attribute = false))
+            .append("</")
+            .append(name)
+            .append(">\n")
     }
 
     /** Element with xsd:anyType content, written compactly; namespaces the content needs are declared in it. */
-    fun raw(name: String, value: XmlContent?) {
+    fun raw(
+        name: String,
+        value: XmlContent?,
+    ) {
         if (value == null) return
         indent()
-        out.append('<').append(name).append('>').append(value.toXml(ROOT_SCOPE)).append("</").append(name).append(">\n")
+        out
+            .append('<')
+            .append(name)
+            .append('>')
+            .append(value.toXml(ROOT_SCOPE))
+            .append("</")
+            .append(name)
+            .append(">\n")
     }
 
     private companion object {
@@ -73,7 +102,14 @@ internal class XmlOut {
 
     private fun attributes(attributes: Array<out Pair<String, String?>>) {
         for ((key, value) in attributes) {
-            if (value != null) out.append(' ').append(key).append("=\"").append(escape(value, attribute = true)).append('"')
+            if (value != null) {
+                out
+                    .append(' ')
+                    .append(key)
+                    .append("=\"")
+                    .append(escape(value, attribute = true))
+                    .append('"')
+            }
         }
     }
 

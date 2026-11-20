@@ -19,33 +19,50 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ItScopeTest {
-
     // --- UDX with just a value ---
 
     @Test
     fun `a UDX element can hold just a value`() {
         val content = XmlContent.parse("<UDX.DROPSHIPMENT>TRUE</UDX.DROPSHIPMENT><UDX.OTHER>kept</UDX.OTHER>")
         assertEquals(true, content[ItScopeUdx.DROPSHIPMENT])
-        assertEquals("<UDX.DROPSHIPMENT>false</UDX.DROPSHIPMENT><UDX.OTHER>kept</UDX.OTHER>", content.with(ItScopeUdx.DROPSHIPMENT, false).toXml())
+        assertEquals(
+            "<UDX.DROPSHIPMENT>false</UDX.DROPSHIPMENT><UDX.OTHER>kept</UDX.OTHER>",
+            content.with(ItScopeUdx.DROPSHIPMENT, false).toXml(),
+        )
     }
 
     @Test
     fun `value UDX are checked like every other UDX`() {
         val maybe = XmlContent.parse("<UDX.DROPSHIPMENT>maybe</UDX.DROPSHIPMENT>")
-        assertEquals("UDX.DROPSHIPMENT: 'maybe' is not a valid boolean", assertFailsWith<UdxViolationException> { maybe[ItScopeUdx.DROPSHIPMENT] }.message)
+        assertEquals(
+            "UDX.DROPSHIPMENT: 'maybe' is not a valid boolean",
+            assertFailsWith<UdxViolationException> {
+                maybe[ItScopeUdx.DROPSHIPMENT]
+            }.message,
+        )
         val empty = XmlContent.parse("<UDX.DROPSHIPMENT/>")
-        assertEquals("UDX.DROPSHIPMENT: a value is missing", assertFailsWith<UdxViolationException> { empty[ItScopeUdx.DROPSHIPMENT] }.message)
+        assertEquals(
+            "UDX.DROPSHIPMENT: a value is missing",
+            assertFailsWith<UdxViolationException> { empty[ItScopeUdx.DROPSHIPMENT] }.message,
+        )
         val nested = XmlContent.parse("<UDX.DROPSHIPMENT><X/></UDX.DROPSHIPMENT>")
-        assertEquals("UDX.DROPSHIPMENT: unknown element X", assertFailsWith<UdxViolationException> { nested[ItScopeUdx.DROPSHIPMENT] }.message)
+        assertEquals(
+            "UDX.DROPSHIPMENT: unknown element X",
+            assertFailsWith<UdxViolationException> { nested[ItScopeUdx.DROPSHIPMENT] }.message,
+        )
         val length = UdxType.value("UDX.CODE", SimpleTypes.string(maxLength = 3))
         assertFailsWith<UdxViolationException> { length.write("toolong") }
     }
 
-    data class Weight(val value: java.math.BigDecimal, val unit: String)
+    data class Weight(
+        val value: java.math.BigDecimal,
+        val unit: String,
+    )
 
     object WeightUdx : UdxType<Weight>("UDX.WEIGHT") {
         private val value = text(Weight::value, decimal())
         private val unit = attribute("unit", Weight::unit, string())
+
         override fun create(v: Values) = Weight(v[value], v[unit])
     }
 
@@ -55,13 +72,15 @@ class ItScopeTest {
         assertEquals("""<UDX.WEIGHT unit="KGM">2.5</UDX.WEIGHT>""", WeightUdx.write(weight).toString())
         assertEquals(weight, WeightUdx.read(WeightUdx.write(weight)))
 
-        val error = assertFailsWith<IllegalArgumentException> {
-            object : UdxType<String>("UDX.BROKEN") {
-                private val a = text({ it }, string())
-                private val b = required("B", { it }, string())
-                override fun create(v: Values) = v[a]
+        val error =
+            assertFailsWith<IllegalArgumentException> {
+                object : UdxType<String>("UDX.BROKEN") {
+                    private val a = text({ it }, string())
+                    private val b = required("B", { it }, string())
+
+                    override fun create(v: Values) = v[a]
+                }
             }
-        }
         assertEquals("UDX.BROKEN: text and child elements cannot be combined", error.message)
     }
 
@@ -69,16 +88,24 @@ class ItScopeTest {
     fun `typed access to ITscope's UDX`() {
         assertNull(spikeOrder.dropshipment)
         val udx = (spikeOrder.orderHeader.orderInfo.headerUdx ?: XmlContent.EMPTY).with(ItScopeUdx.DROPSHIPMENT, true)
-        val order = spikeOrder.copy(orderHeader = spikeOrder.orderHeader.copy(orderInfo = spikeOrder.orderHeader.orderInfo.copy(headerUdx = udx)))
+        val order =
+            spikeOrder.copy(
+                orderHeader = spikeOrder.orderHeader.copy(orderInfo = spikeOrder.orderHeader.orderInfo.copy(headerUdx = udx)),
+            )
         assertEquals(true, order.dropshipment)
-        val item = order.orderItems.first().copy(itemUdx = XmlContent.parse("<UDX.BUNDLEPARTSLISTVISIBLE>false</UDX.BUNDLEPARTSLISTVISIBLE>"))
+        val item =
+            order.orderItems.first().copy(
+                itemUdx = XmlContent.parse("<UDX.BUNDLEPARTSLISTVISIBLE>false</UDX.BUNDLEPARTSLISTVISIBLE>"),
+            )
         assertEquals(false, item.bundlePartsListVisible)
     }
 
     // --- rules ---
 
-    private fun withOrderId(order: Order, id: String) =
-        order.copy(orderHeader = order.orderHeader.copy(orderInfo = order.orderHeader.orderInfo.copy(orderId = id)))
+    private fun withOrderId(
+        order: Order,
+        id: String,
+    ) = order.copy(orderHeader = order.orderHeader.copy(orderInfo = order.orderHeader.orderInfo.copy(orderId = id)))
 
     @Test
     fun `ORDER_ID is limited to 18 characters`() {
@@ -91,9 +118,16 @@ class ItScopeTest {
     @Test
     fun `buyer and delivery addresses need name, street, ZIP code and country`() {
         val info = spikeOrder.orderHeader.orderInfo
-        val noStreet = info.parties.map { party ->
-            if (PartyRole.BUYER in party.partyRoles) party.copy(addresses = party.addresses.map { it.copy(streets = emptyList()) }) else party
-        }
+        val noStreet =
+            info.parties.map { party ->
+                if (PartyRole.BUYER in
+                    party.partyRoles
+                ) {
+                    party.copy(addresses = party.addresses.map { it.copy(streets = emptyList()) })
+                } else {
+                    party
+                }
+            }
         val order = spikeOrder.copy(orderHeader = spikeOrder.orderHeader.copy(orderInfo = info.copy(parties = noStreet)))
         val violation = ItScopeRules.violations(order).single()
         assertIs<IncompleteDocumentException>(violation)
@@ -103,7 +137,16 @@ class ItScopeTest {
 
     @Test
     fun `every item needs a supplier article number`() {
-        val items = spikeOrder.orderItems.mapIndexed { i, item -> if (i == 1) item.copy(productId = item.productId.copy(supplierPid = null)) else item }
+        val items =
+            spikeOrder.orderItems.mapIndexed { i, item ->
+                if (i ==
+                    1
+                ) {
+                    item.copy(productId = item.productId.copy(supplierPid = null))
+                } else {
+                    item
+                }
+            }
         val violation = ItScopeRules.violations(spikeOrder.copy(orderItems = items)).single()
         assertEquals("ITscope needs a SUPPLIER_PID for item 2", violation.message)
     }

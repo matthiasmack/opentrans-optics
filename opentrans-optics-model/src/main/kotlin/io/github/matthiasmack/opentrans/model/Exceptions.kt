@@ -16,30 +16,41 @@ package io.github.matthiasmack.opentrans.model
  */
 
 /** Base class of all exceptions about documents and their data. */
-open class OpenTransException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
+open class OpenTransException(
+    message: String,
+    cause: Throwable? = null,
+) : RuntimeException(message, cause)
 
 /**
  * XML that is not well-formed or does not conform to the openTRANS 2.1 schema,
  * on reading or writing. [errors] lists every problem found, with line and
  * column where the validator reports them.
  */
-class OpenTransValidationException(val errors: List<String>) :
-    OpenTransException("Not valid openTRANS 2.1 XML:\n" + errors.joinToString("\n") { "  - $it" })
+class OpenTransValidationException(
+    val errors: List<String>,
+) : OpenTransException("Not valid openTRANS 2.1 XML:\n" + errors.joinToString("\n") { "  - $it" })
 
 /**
  * A value that violates an XSD facet (length, pattern, allowed values, range,
  * digits), thrown where the value is created. The message starts with the XML
  * path: `ORDER_INFO/ORDER_ID: at most 250 characters, got 251`.
  */
-class FacetViolationException(message: String) : OpenTransException(message)
+class FacetViolationException(
+    message: String,
+) : OpenTransException(message)
 
 /**
  * A required value is missing, e.g. a builder without ORDER_ID or an order
  * without a supplier. [element] is the XML path of what is missing
  * (`ORDER_INFO/ORDER_ID`), for mapping the error back to your own data.
  */
-class IncompleteDocumentException(val element: String, message: String) : OpenTransException(message)
+class IncompleteDocumentException(
+    val element: String,
+    message: String,
+) : OpenTransException(message)
 
 /** A document of another type than expected, e.g. `readAs<Order>` on an INVOICE. */
-class DocumentTypeException(val expected: String, val found: String) :
-    OpenTransException("Expected $expected, found $found")
+class DocumentTypeException(
+    val expected: String,
+    val found: String,
+) : OpenTransException("Expected $expected, found $found")

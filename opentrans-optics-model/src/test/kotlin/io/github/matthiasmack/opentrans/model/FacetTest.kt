@@ -10,7 +10,6 @@ import kotlin.test.assertFailsWith
  * derive and write documents through the same checks.
  */
 class FacetTest {
-
     private fun violation(block: () -> Unit) = assertFailsWith<FacetViolationException>(block = block).message
 
     @Test
@@ -37,15 +36,18 @@ class FacetTest {
     fun `code lists kept as strings are checked`() {
         Language("deu")
         assertEquals("LANGUAGE/value: 'klingon' is not an allowed value", violation { Language("klingon") })
-        assertEquals("ORDER_INFO/CURRENCY: 'EURO' is not an allowed value", violation {
-            OrderInfo(
-                orderId = "PO-1",
-                orderDate = DateTime("2026-11-17"),
-                parties = listOf(Party(partyIds = listOf(PartyId("B-1")))),
-                orderPartiesReference = OrderPartiesReference(PartyId("B-1"), PartyId("S-1")),
-                currency = "EURO",
-            )
-        })
+        assertEquals(
+            "ORDER_INFO/CURRENCY: 'EURO' is not an allowed value",
+            violation {
+                OrderInfo(
+                    orderId = "PO-1",
+                    orderDate = DateTime("2026-11-17"),
+                    parties = listOf(Party(partyIds = listOf(PartyId("B-1")))),
+                    orderPartiesReference = OrderPartiesReference(PartyId("B-1"), PartyId("S-1")),
+                    currency = "EURO",
+                )
+            },
+        )
     }
 
     @Test
@@ -55,7 +57,10 @@ class FacetTest {
         PartyId("B-1", "kundenspezifischä")
         // For XSD, '_' is punctuation, so it is only valid inside the listed values (buyer_specific, ...).
         // xmllint rejects this value as well.
-        assertEquals("typePARTY_ID/@type: 'kundenspezifisch_ä' does not match the XSD pattern", violation { PartyId("B-1", "kundenspezifisch_ä") })
+        assertEquals(
+            "typePARTY_ID/@type: 'kundenspezifisch_ä' does not match the XSD pattern",
+            violation { PartyId("B-1", "kundenspezifisch_ä") },
+        )
         assertEquals("typePARTY_ID/@type: 'not allowed!' does not match the XSD pattern", violation { PartyId("B-1", "not allowed!") })
     }
 }

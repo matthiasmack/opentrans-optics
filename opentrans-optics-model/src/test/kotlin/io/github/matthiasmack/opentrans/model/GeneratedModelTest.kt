@@ -43,31 +43,58 @@ import kotlin.test.assertNull
 
 /** The model generated from the XSD can be built and navigated with Arrow optics. */
 class GeneratedModelTest {
-
-    private val order = Order(
-        orderHeader = OrderHeader(
-            orderInfo = OrderInfo(
-                orderId = "PO-1",
-                orderDate = DateTime("2026-11-17"),
-                parties = listOf(Party(partyIds = listOf(PartyId("B-1")))),
-                orderPartiesReference = OrderPartiesReference(PartyId("B-1"), PartyId("S-1")),
-                payment = Payment(
-                    method = Card(cardNum = "4111", cardExpirationDate = DateTime("2028-05"), cardHolderName = "card-holder", type = "VISA"),
-                    paymentTerms = PaymentTerms(timesForPayment = listOf(TimeForPayment(due = Days(10)))),
+    private val order =
+        Order(
+            orderHeader =
+                OrderHeader(
+                    orderInfo =
+                        OrderInfo(
+                            orderId = "PO-1",
+                            orderDate = DateTime("2026-11-17"),
+                            parties = listOf(Party(partyIds = listOf(PartyId("B-1")))),
+                            orderPartiesReference = OrderPartiesReference(PartyId("B-1"), PartyId("S-1")),
+                            payment =
+                                Payment(
+                                    method =
+                                        Card(
+                                            cardNum = "4111",
+                                            cardExpirationDate = DateTime("2028-05"),
+                                            cardHolderName = "card-holder",
+                                            type = "VISA",
+                                        ),
+                                    paymentTerms = PaymentTerms(timesForPayment = listOf(TimeForPayment(due = Days(10)))),
+                                ),
+                        ),
                 ),
-            ),
-        ),
-        orderItems = listOf(
-            OrderItem(lineItemId = "1", productId = ProductId(supplierPid = SupplierPid("SKU-A")), quantity = BigDecimal("2"), orderUnit = "C62", productPriceFix = ProductPriceFix(BigDecimal("1.50"))),
-            OrderItem(lineItemId = "2", productId = ProductId(supplierPid = SupplierPid("SKU-B")), quantity = BigDecimal("1"), orderUnit = "C62", productPriceFix = ProductPriceFix(BigDecimal("4.00"))),
-        ),
-        orderSummary = OrderSummary(totalItemNum = 2),
-        type = OrderType.STANDARD,
-    )
+            orderItems =
+                listOf(
+                    OrderItem(
+                        lineItemId = "1",
+                        productId = ProductId(supplierPid = SupplierPid("SKU-A")),
+                        quantity = BigDecimal("2"),
+                        orderUnit = "C62",
+                        productPriceFix = ProductPriceFix(BigDecimal("1.50")),
+                    ),
+                    OrderItem(
+                        lineItemId = "2",
+                        productId = ProductId(supplierPid = SupplierPid("SKU-B")),
+                        quantity = BigDecimal("1"),
+                        orderUnit = "C62",
+                        productPriceFix = ProductPriceFix(BigDecimal("4.00")),
+                    ),
+                ),
+            orderSummary = OrderSummary(totalItemNum = 2),
+            type = OrderType.STANDARD,
+        )
 
     @Test
     fun `lens chain through generated classes`() {
-        assertEquals("PO-2", Order.orderHeader.orderInfo.orderId.set(order, "PO-2").orderHeader.orderInfo.orderId)
+        assertEquals(
+            "PO-2",
+            Order.orderHeader.orderInfo.orderId
+                .set(order, "PO-2")
+                .orderHeader.orderInfo.orderId,
+        )
     }
 
     @Test
@@ -80,8 +107,15 @@ class GeneratedModelTest {
     fun `prisms into generated choices`() {
         val method = Order.orderHeader.orderInfo.payment.notNull.method
         // ITscope makes the payment method optional, hence notNull.
-        assertEquals("4111", method.notNull.card.cardNum.getOrNull(order))
-        assertNull(method.notNull.card.cardNum.getOrNull(method.set(order, Debit(true))))
+        assertEquals(
+            "4111",
+            method.notNull.card.cardNum
+                .getOrNull(order),
+        )
+        assertNull(
+            method.notNull.card.cardNum
+                .getOrNull(method.set(order, Debit(true))),
+        )
 
         val days = Order.orderHeader.orderInfo.payment.notNull.paymentTerms.notNull.timesForPayment.every.due.days.value
         assertEquals(listOf(10), days.getAll(order))

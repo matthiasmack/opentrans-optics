@@ -8,11 +8,17 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 class DateTimeTest {
-
     @Test
     fun `accepts every form the XSD allows and rejects the rest`() {
-        listOf("2026", "2026-11", "2026-11-17", "2026-11-17T09:30", "2026-11-17T09:30:00", "2026-11-17T09:30:00.123Z", "2026-11-17T09:30:00+01:00")
-            .forEach { DateTime(it) }
+        listOf(
+            "2026",
+            "2026-11",
+            "2026-11-17",
+            "2026-11-17T09:30",
+            "2026-11-17T09:30:00",
+            "2026-11-17T09:30:00.123Z",
+            "2026-11-17T09:30:00+01:00",
+        ).forEach { DateTime(it) }
         listOf("asdsdertfd", "", "26-11-17", "2026-13", "2026-11-17T24:00", "2026-11-17 09:30", "2026-11-17T09:30:00+1")
             .forEach { assertFailsWith<FacetViolationException>(it) { DateTime(it) } }
     }

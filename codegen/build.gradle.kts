@@ -10,7 +10,10 @@ dependencies {
     implementation(libs.kotlinpoet)
 }
 
-val schemaDir = rootProject.layout.projectDirectory.dir("opentrans-optics-xml/src/main/resources/io/github/matthiasmack/opentrans/xsd/itscope")
+val schemaDir =
+    rootProject.layout.projectDirectory.dir(
+        "opentrans-optics-xml/src/main/resources/io/github/matthiasmack/opentrans/xsd/itscope",
+    )
 
 tasks.register<JavaExec>("inventory") {
     description = "Prints which XSD constructs are reachable from the openTRANS document roots."
@@ -35,5 +38,13 @@ tasks.register<JavaExec>("generatePreview") {
     description = "Generates the model into build/preview for inspection."
     classpath = sourceSets.main.get().runtimeClasspath
     mainClass = "io.github.matthiasmack.opentrans.codegen.GenerateKt"
-    args("model", schemaDir.file("opentrans_2_1.xsd").asFile.absolutePath, layout.buildDirectory.dir("preview").get().asFile.absolutePath, "opentrans.generated")
+    args(
+        "model",
+        schemaDir.file("opentrans_2_1.xsd").asFile.absolutePath,
+        layout.buildDirectory
+            .dir("preview")
+            .get()
+            .asFile.absolutePath,
+        "opentrans.generated",
+    )
 }

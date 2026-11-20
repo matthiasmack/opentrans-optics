@@ -22,13 +22,17 @@ import kotlin.test.assertIs
 
 /** Every problem with a document or its data can be caught as one [OpenTransException]. */
 class ExceptionsTest {
-
     private fun caught(block: () -> Unit): OpenTransException = assertFailsWith<OpenTransException> { block() }
 
     @Test
     fun `one catch covers every data problem`() {
         assertIs<OpenTransValidationException>(caught { OpenTransXml.read("<ORDER/>") })
-        assertIs<FacetViolationException>(caught { Order.orderHeader.orderInfo.orderId.set(spikeOrder, "x".repeat(251)) })
+        assertIs<FacetViolationException>(
+            caught {
+                Order.orderHeader.orderInfo.orderId
+                    .set(spikeOrder, "x".repeat(251))
+            },
+        )
         assertIs<IncompleteDocumentException>(caught { order(id = "PO", date = "2026-11-17") { } })
         assertIs<UdxViolationException>(caught { udx { add(CostCenterUdx, CostCenter("42")) } })
         val wrongType = caught { OpenTransXml.readAs<Invoice>(OpenTransXml.write(spikeOrder)) }
@@ -38,7 +42,13 @@ class ExceptionsTest {
 
     @Test
     fun `wrong use of the API is not a data problem`() {
-        val error = assertFailsWith<IllegalStateException> { order(id = "PO", date = "2026-11-17") { buyer { id("B") }; buyer { id("C") } } }
+        val error =
+            assertFailsWith<IllegalStateException> {
+                order(id = "PO", date = "2026-11-17") {
+                    buyer { id("B") }
+                    buyer { id("C") }
+                }
+            }
         assertEquals("buyer { } may only be given once", error.message)
     }
 }

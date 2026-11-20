@@ -3,8 +3,8 @@ package io.github.matthiasmack.opentrans.dsl
 import io.github.matthiasmack.opentrans.itscope.ItScopeRules
 import io.github.matthiasmack.opentrans.itscope.bundlePartsListVisible
 import io.github.matthiasmack.opentrans.itscope.dropshipment
-import io.github.matthiasmack.opentrans.model.IncompleteDocumentException
 import io.github.matthiasmack.opentrans.model.ContractInformation
+import io.github.matthiasmack.opentrans.model.IncompleteDocumentException
 import io.github.matthiasmack.opentrans.model.OpenTransValidationException
 import io.github.matthiasmack.opentrans.model.Order
 import io.github.matthiasmack.opentrans.model.OrderReference
@@ -29,39 +29,48 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 class ItScopeDslTest {
-
     /** Like ITscope's example "Laufzeitprodukt": a subscription next to a one-off item. */
-    private val subscriptionOrder = order(id = "PO-1", date = LocalDate.of(2026, 11, 20)) {
-        buyer {
-            id("12345", "supplier_specific")
-            address { name("Example Ltd"); street("Musterweg 1"); zip("10000"); city("Musterstadt"); country = "DE" }
-        }
-        supplier { id("10000735", "buyer_specific") }
-        currency = "EUR"
-        subscriptionType = "SALES"
-        dropshipment()
-        udx { add(ProjectUdx, Project("project-7", null)) }
+    private val subscriptionOrder =
+        order(id = "PO-1", date = LocalDate.of(2026, 11, 20)) {
+            buyer {
+                id("12345", "supplier_specific")
+                address {
+                    name("Example Ltd")
+                    street("Musterweg 1")
+                    zip("10000")
+                    city("Musterstadt")
+                    country = "DE"
+                }
+            }
+            supplier { id("10000735", "buyer_specific") }
+            currency = "EUR"
+            subscriptionType = "SALES"
+            dropshipment()
+            udx { add(ProjectUdx, Project("project-7", null)) }
 
-        item(quantity = 1, unit = "MON") {
-            supplierPid("123002", "supplier_specific")
-            description("iPad Pro, rented")
-            price("49.99")
-            contract(period = 12, unit = RecurringType.MON, billing = 1)
-            stock(amount = 13, status = "OnStock")
+            item(quantity = 1, unit = "MON") {
+                supplierPid("123002", "supplier_specific")
+                description("iPad Pro, rented")
+                price("49.99")
+                contract(period = 12, unit = RecurringType.MON, billing = 1)
+                stock(amount = 13, status = "OnStock")
+            }
+            item(quantity = 1, unit = "C62") {
+                supplierPid("123003", "supplier_specific")
+                description("Microsoft 365, ESD")
+                productType = ProductType.ESD
+                price("1158.00")
+                udx { add(CostCenterUdx, CostCenter("cc-42")) }
+            }
         }
-        item(quantity = 1, unit = "C62") {
-            supplierPid("123003", "supplier_specific")
-            description("Microsoft 365, ESD")
-            productType = ProductType.ESD
-            price("1158.00")
-            udx { add(CostCenterUdx, CostCenter("cc-42")) }
-        }
-    }
 
     @Test
     fun `the order DSL builds ITscope's extensions`() {
         val (rented, esd) = subscriptionOrder.orderItems
-        assertEquals(ContractInformation(subscriptionPeriod = 12, subscriptionPeriodUnit = RecurringType.MON, billingPeriod = 1), rented.contractInformation)
+        assertEquals(
+            ContractInformation(subscriptionPeriod = 12, subscriptionPeriodUnit = RecurringType.MON, billingPeriod = 1),
+            rented.contractInformation,
+        )
         assertEquals(BigDecimal("13"), rented.productStockFix?.stockAmount)
         assertEquals(ProductType.ESD, esd.productId.productType)
         assertEquals("SALES", subscriptionOrder.orderHeader.orderInfo.subscriptionType)
@@ -107,27 +116,28 @@ class ItScopeDslTest {
     // --- bundles ---
 
     /** ITscope's bundle example: a phone with screen protector and case as one item. */
-    private val bundleOrder = order(id = "PO-2", date = LocalDate.of(2026, 11, 20)) {
-        buyer { id("12345", "supplier_specific") }
-        supplier { id("10000735", "buyer_specific") }
-        item(quantity = 1, unit = "C62") {
-            supplierPid("SAMPLE_SUPPLIER_ID", "supplier_specific")
-            internationalPid("1000001209000", "itscope")
-            description("Apple iPhone SE 2022 128GB rot - Bundle")
-            price("510.00")
-            bundle(partsListVisible = true) {
-                component(quantity = 1, unit = "C62") {
-                    supplierPid("13113721000", "supplier_specific")
-                    internationalPid("0194253014645", "ean")
-                    longDescription("Apple iPhone SE - (PRODUCT) RED - 5G Smartphone, 128 GB")
-                }
-                component(quantity = 1, unit = "C62") {
-                    supplierPid("1000001211000", "supplier_specific")
-                    longDescription("Panzerglasfolie für Apple iPhone SE 2022")
+    private val bundleOrder =
+        order(id = "PO-2", date = LocalDate.of(2026, 11, 20)) {
+            buyer { id("12345", "supplier_specific") }
+            supplier { id("10000735", "buyer_specific") }
+            item(quantity = 1, unit = "C62") {
+                supplierPid("SAMPLE_SUPPLIER_ID", "supplier_specific")
+                internationalPid("1000001209000", "itscope")
+                description("Apple iPhone SE 2022 128GB rot - Bundle")
+                price("510.00")
+                bundle(partsListVisible = true) {
+                    component(quantity = 1, unit = "C62") {
+                        supplierPid("13113721000", "supplier_specific")
+                        internationalPid("0194253014645", "ean")
+                        longDescription("Apple iPhone SE - (PRODUCT) RED - 5G Smartphone, 128 GB")
+                    }
+                    component(quantity = 1, unit = "C62") {
+                        supplierPid("1000001211000", "supplier_specific")
+                        longDescription("Panzerglasfolie für Apple iPhone SE 2022")
+                    }
                 }
             }
         }
-    }
 
     @Test
     fun `bundles carry their parts, product types and parts list flag`() {
@@ -147,22 +157,26 @@ class ItScopeDslTest {
 
     @Test
     fun `a bundle needs parts and is given once`() {
-        val empty = assertFailsWith<IncompleteDocumentException> {
-            order(id = "PO", date = "2026-11-20") {
-                buyer { id("B") }; supplier { id("S") }
-                item(quantity = 1, unit = "C62") { bundle { } }
-            }
-        }
-        assertEquals("PRODUCT_COMPONENTS/PRODUCT_COMPONENT", empty.element)
-        val twice = assertFailsWith<IllegalStateException> {
-            order(id = "PO", date = "2026-11-20") {
-                buyer { id("B") }; supplier { id("S") }
-                item(quantity = 1, unit = "C62") {
-                    bundle { component(1, "C62") { supplierPid("A") } }
-                    bundle { component(1, "C62") { supplierPid("B") } }
+        val empty =
+            assertFailsWith<IncompleteDocumentException> {
+                order(id = "PO", date = "2026-11-20") {
+                    buyer { id("B") }
+                    supplier { id("S") }
+                    item(quantity = 1, unit = "C62") { bundle { } }
                 }
             }
-        }
+        assertEquals("PRODUCT_COMPONENTS/PRODUCT_COMPONENT", empty.element)
+        val twice =
+            assertFailsWith<IllegalStateException> {
+                order(id = "PO", date = "2026-11-20") {
+                    buyer { id("B") }
+                    supplier { id("S") }
+                    item(quantity = 1, unit = "C62") {
+                        bundle { component(1, "C62") { supplierPid("A") } }
+                        bundle { component(1, "C62") { supplierPid("B") } }
+                    }
+                }
+            }
         assertEquals("bundle { } may only be given once per item", twice.message)
     }
 }

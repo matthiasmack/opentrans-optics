@@ -24,9 +24,15 @@ object SchemaLoader {
             ?: error("Could not load schema $rootXsd")
     }
 
-    private class Resolver(private val dir: File) : LSResourceResolver {
+    private class Resolver(
+        private val dir: File,
+    ) : LSResourceResolver {
         override fun resolveResource(
-            type: String?, namespaceURI: String?, publicId: String?, systemId: String?, baseURI: String?,
+            type: String?,
+            namespaceURI: String?,
+            publicId: String?,
+            systemId: String?,
+            baseURI: String?,
         ): LSInput {
             val local = systemId?.substringAfterLast('/')?.let { File(dir, it) }
             return when {

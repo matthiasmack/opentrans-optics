@@ -36,7 +36,10 @@ import java.io.File
  * alternative of a choice. `build()` checks required properties and names the
  * XML element in the error.
  */
-class DslEmitter(private val pkg: String, private val modelPkg: String) {
+class DslEmitter(
+    private val pkg: String,
+    private val modelPkg: String,
+) {
     private val model = ModelEmitter(modelPkg)
     private val dslMarker = ClassName(pkg, "OpenTransDsl")
     private val rawXml = ClassName("io.github.matthiasmack.opentrans.model", "XmlContent")
@@ -44,9 +47,14 @@ class DslEmitter(private val pkg: String, private val modelPkg: String) {
     private val contentBuilder = ClassName(pkg, "XmlContentBuilder")
     private val incomplete = ClassName(modelPkg, "IncompleteDocumentException")
 
-    fun emit(ir: Ir, outDir: File) {
-        val file = FileSpec.builder(pkg, "GeneratedBuilders")
-            .addFileComment("openTRANS 2.1 builder DSL. Generated from the XSD, do not edit.")
+    fun emit(
+        ir: Ir,
+        outDir: File,
+    ) {
+        val file =
+            FileSpec
+                .builder(pkg, "GeneratedBuilders")
+                .addFileComment("openTRANS 2.1 builder DSL. Generated from the XSD, do not edit.")
         for (cls in ir.classes.filter { it.props.isNotEmpty() }) {
             file.addType(builder(cls))
             file.addFunction(factory(cls))
@@ -58,7 +66,8 @@ class DslEmitter(private val pkg: String, private val modelPkg: String) {
 
     private fun factory(cls: ClassDef): FunSpec {
         val type = ClassName(modelPkg, cls.name)
-        return FunSpec.builder("invoke")
+        return FunSpec
+            .builder("invoke")
             .addModifiers(KModifier.OPERATOR)
             .receiver(type.nestedClass("Companion"))
             .addParameter("block", LambdaTypeName.get(receiver = builderName(cls), returnType = UNIT))
@@ -69,13 +78,16 @@ class DslEmitter(private val pkg: String, private val modelPkg: String) {
     }
 
     /** A class whose properties are all single scalars or enums gets a parameter-list shortcut. */
-    private fun isSimple(cls: ClassDef) = cls.props.size <= 6 &&
-        cls.props.all { (it.type is KType.Scalar || it.type is KType.Enum) && it.card !is Card.Many }
+    private fun isSimple(cls: ClassDef) =
+        cls.props.size <= 6 &&
+            cls.props.all { (it.type is KType.Scalar || it.type is KType.Enum) && it.card !is Card.Many }
 
     private fun builder(cls: ClassDef): TypeSpec {
-        val type = TypeSpec.classBuilder(builderName(cls))
-            .addAnnotation(dslMarker)
-            .addKdoc("Builder for [%T] (openTRANS `%L`).", ClassName(modelPkg, cls.name), cls.origin)
+        val type =
+            TypeSpec
+                .classBuilder(builderName(cls))
+                .addAnnotation(dslMarker)
+                .addKdoc("Builder for [%T] (openTRANS `%L`).", ClassName(modelPkg, cls.name), cls.origin)
         val members = NameRegistry(cls.props.map { it.name }.toSet())
         val args = mutableListOf<CodeBlock>()
 
@@ -83,7 +95,8 @@ class DslEmitter(private val pkg: String, private val modelPkg: String) {
             val valueType = model.typeName(prop.type)
             if (prop.card is Card.Many) {
                 type.addProperty(
-                    PropertySpec.builder(prop.name, MUTABLE_LIST.parameterizedBy(valueType))
+                    PropertySpec
+                        .builder(prop.name, MUTABLE_LIST.parameterizedBy(valueType))
                         .initializer("mutableListOf()")
                         .build(),
                 )
@@ -92,17 +105,26 @@ class DslEmitter(private val pkg: String, private val modelPkg: String) {
                 args += CodeBlock.of("%N = %N.toList()", prop.name, prop.name)
             } else {
                 type.addProperty(
-                    PropertySpec.builder(prop.name, valueType.copy(nullable = true))
+                    PropertySpec
+                        .builder(prop.name, valueType.copy(nullable = true))
                         .mutable()
                         .initializer("null")
                         .build(),
                 )
                 setters(prop, valueType, members).forEach(type::addFunction)
-                args += if (prop.card == Card.Required) {
-                    CodeBlock.of("%N = %N ?: throw %T(%S, %S)", prop.name, prop.name, incomplete, "${cls.origin}/${xmlLabel(prop)}", "${cls.origin} needs ${xmlLabel(prop)} (${prop.name})")
-                } else {
-                    CodeBlock.of("%N = %N", prop.name, prop.name)
-                }
+                args +=
+                    if (prop.card == Card.Required) {
+                        CodeBlock.of(
+                            "%N = %N ?: throw %T(%S, %S)",
+                            prop.name,
+                            prop.name,
+                            incomplete,
+                            "${cls.origin}/${xmlLabel(prop)}",
+                            "${cls.origin} needs ${xmlLabel(prop)} (${prop.name})",
+                        )
+                    } else {
+                        CodeBlock.of("%N = %N", prop.name, prop.name)
+                    }
             }
         }
 
@@ -110,7 +132,8 @@ class DslEmitter(private val pkg: String, private val modelPkg: String) {
         args.forEach { build.add("%L,\n", it) }
         build.unindent().add(")\n")
         type.addFunction(
-            FunSpec.builder("build")
+            FunSpec
+                .builder("build")
                 .addModifiers(KModifier.INTERNAL)
                 .returns(ClassName(modelPkg, cls.name))
                 .addCode(build.build())
@@ -120,46 +143,92 @@ class DslEmitter(private val pkg: String, private val modelPkg: String) {
     }
 
     /** Helpers that set a single-valued property. */
-    private fun setters(prop: Prop, valueType: com.squareup.kotlinpoet.TypeName, members: NameRegistry): List<FunSpec> {
+    private fun setters(
+        prop: Prop,
+        valueType: com.squareup.kotlinpoet.TypeName,
+        members: NameRegistry,
+    ): List<FunSpec> {
         val name = prop.name
         return when (val t = prop.type) {
-            is KType.Class -> classHelpers(name, t.def) { "this.%N = %L" }
-            is KType.Scalar -> scalarHelpers(name, t.kind) { "this.%N = %L" }
-            KType.Raw -> listOf(
-                FunSpec.builder(name).addParameter("xml", STRING)
-                    .addStatement("this.%N = %T.parse(xml)", name, rawXml).build(),
-                FunSpec.builder(name)
-                    .addParameter("block", LambdaTypeName.get(receiver = contentBuilder, returnType = UNIT))
-                    .addStatement("this.%N = %T().apply(block).build()", name, contentBuilder).build(),
-            )
-            is KType.Choice -> t.def.variants.flatMap { variant ->
-                val helper = members.claimOrNull(variant.cls.name.replaceFirstChar(Char::lowercase)) ?: return@flatMap emptyList()
-                classHelpers(helper, variant.cls, target = name) { "this.%N = %L" }
+            is KType.Class -> {
+                classHelpers(name, t.def) { "this.%N = %L" }
             }
-            is KType.Enum -> emptyList()
+
+            is KType.Scalar -> {
+                scalarHelpers(name, t.kind) { "this.%N = %L" }
+            }
+
+            KType.Raw -> {
+                listOf(
+                    FunSpec
+                        .builder(name)
+                        .addParameter("xml", STRING)
+                        .addStatement("this.%N = %T.parse(xml)", name, rawXml)
+                        .build(),
+                    FunSpec
+                        .builder(name)
+                        .addParameter("block", LambdaTypeName.get(receiver = contentBuilder, returnType = UNIT))
+                        .addStatement("this.%N = %T().apply(block).build()", name, contentBuilder)
+                        .build(),
+                )
+            }
+
+            is KType.Choice -> {
+                t.def.variants.flatMap { variant ->
+                    val helper = members.claimOrNull(variant.cls.name.replaceFirstChar(Char::lowercase)) ?: return@flatMap emptyList()
+                    classHelpers(helper, variant.cls, target = name) { "this.%N = %L" }
+                }
+            }
+
+            is KType.Enum -> {
+                emptyList()
+            }
         }
     }
 
     /** Helpers that add to a list property. */
-    private fun adders(prop: Prop, singular: String, valueType: com.squareup.kotlinpoet.TypeName): List<FunSpec> = when (val t = prop.type) {
-        is KType.Class -> classHelpers(singular, t.def, target = prop.name) { "this.%N += %L" }
-        is KType.Scalar -> scalarHelpers(singular, t.kind, target = prop.name) { "this.%N += %L" }
-        else -> listOf(
-            FunSpec.builder(singular).addParameter("value", valueType)
-                .addStatement("this.%N += value", prop.name).build(),
-        )
-    }
+    private fun adders(
+        prop: Prop,
+        singular: String,
+        valueType: com.squareup.kotlinpoet.TypeName,
+    ): List<FunSpec> =
+        when (val t = prop.type) {
+            is KType.Class -> {
+                classHelpers(singular, t.def, target = prop.name) { "this.%N += %L" }
+            }
+
+            is KType.Scalar -> {
+                scalarHelpers(singular, t.kind, target = prop.name) { "this.%N += %L" }
+            }
+
+            else -> {
+                listOf(
+                    FunSpec
+                        .builder(singular)
+                        .addParameter("value", valueType)
+                        .addStatement("this.%N += value", prop.name)
+                        .build(),
+                )
+            }
+        }
 
     /**
      * For a class value: always a nested builder block, and for simple classes
      * additionally a parameter-list shortcut (`name("Example", lang = "eng")`).
      */
-    private fun classHelpers(name: String, cls: ClassDef, target: String = name, op: () -> String): List<FunSpec> {
+    private fun classHelpers(
+        name: String,
+        cls: ClassDef,
+        target: String = name,
+        op: () -> String,
+    ): List<FunSpec> {
         val clsType = ClassName(modelPkg, cls.name)
-        val block = FunSpec.builder(name)
-            .addParameter("block", LambdaTypeName.get(receiver = builderName(cls), returnType = UNIT))
-            .addStatement(op(), target, CodeBlock.of("%T().apply(block).build()", builderName(cls)))
-            .build()
+        val block =
+            FunSpec
+                .builder(name)
+                .addParameter("block", LambdaTypeName.get(receiver = builderName(cls), returnType = UNIT))
+                .addStatement(op(), target, CodeBlock.of("%T().apply(block).build()", builderName(cls)))
+                .build()
         if (!isSimple(cls)) return listOf(block)
 
         val shortcut = FunSpec.builder(name)
@@ -176,31 +245,66 @@ class DslEmitter(private val pkg: String, private val modelPkg: String) {
     }
 
     /** Conversions for dates and decimals: `orderDate("2026-11-17")`, `quantity(2.5)`. */
-    private fun scalarHelpers(name: String, kind: ScalarKind, target: String = name, op: () -> String): List<FunSpec> = when (kind) {
-        ScalarKind.DATETIME -> listOf(
-            FunSpec.builder(name).addKdoc("Anything date-like: DateTime, LocalDate, OffsetDateTime, YearMonth or an XSD date string.")
-                .addParameter("value", ANY).addStatement(op(), target, CodeBlock.of("value.toDateTime()")).build(),
-        )
-        ScalarKind.DECIMAL -> listOf(
-            FunSpec.builder(name).addParameter("value", NUMBER).addStatement(op(), target, CodeBlock.of("value.toDecimal()")).build(),
-            FunSpec.builder(name).addParameter("value", STRING).addStatement(op(), target, CodeBlock.of("%T(value)", bigDecimal)).build(),
-        )
-        else -> if (target == name) emptyList() else listOf(
-            FunSpec.builder(name).addParameter("value", model.typeName(KType.Scalar(kind)))
-                .addStatement(op(), target, CodeBlock.of("value")).build(),
-        )
-    }
+    private fun scalarHelpers(
+        name: String,
+        kind: ScalarKind,
+        target: String = name,
+        op: () -> String,
+    ): List<FunSpec> =
+        when (kind) {
+            ScalarKind.DATETIME -> {
+                listOf(
+                    FunSpec
+                        .builder(name)
+                        .addKdoc("Anything date-like: DateTime, LocalDate, OffsetDateTime, YearMonth or an XSD date string.")
+                        .addParameter("value", ANY)
+                        .addStatement(op(), target, CodeBlock.of("value.toDateTime()"))
+                        .build(),
+                )
+            }
 
-    private fun singularName(prop: Prop): String = when (val b = prop.binding) {
-        is Binding.Element -> Names.propertyName(b.name.localPart)
-        else -> (prop.type as? KType.Class)?.def?.name?.replaceFirstChar(Char::lowercase) ?: prop.name
-    }.let { if (it == prop.name) (prop.type as? KType.Class)?.def?.name?.replaceFirstChar(Char::lowercase) ?: it else it }
+            ScalarKind.DECIMAL -> {
+                listOf(
+                    FunSpec
+                        .builder(name)
+                        .addParameter("value", NUMBER)
+                        .addStatement(op(), target, CodeBlock.of("value.toDecimal()"))
+                        .build(),
+                    FunSpec
+                        .builder(name)
+                        .addParameter("value", STRING)
+                        .addStatement(op(), target, CodeBlock.of("%T(value)", bigDecimal))
+                        .build(),
+                )
+            }
 
-    private fun xmlLabel(prop: Prop): String = when (val b = prop.binding) {
-        is Binding.Element -> b.name.localPart
-        is Binding.Attribute -> "@${b.name}"
-        else -> prop.name
-    }
+            else -> {
+                if (target == name) {
+                    emptyList()
+                } else {
+                    listOf(
+                        FunSpec
+                            .builder(name)
+                            .addParameter("value", model.typeName(KType.Scalar(kind)))
+                            .addStatement(op(), target, CodeBlock.of("value"))
+                            .build(),
+                    )
+                }
+            }
+        }
+
+    private fun singularName(prop: Prop): String =
+        when (val b = prop.binding) {
+            is Binding.Element -> Names.propertyName(b.name.localPart)
+            else -> (prop.type as? KType.Class)?.def?.name?.replaceFirstChar(Char::lowercase) ?: prop.name
+        }.let { if (it == prop.name) (prop.type as? KType.Class)?.def?.name?.replaceFirstChar(Char::lowercase) ?: it else it }
+
+    private fun xmlLabel(prop: Prop): String =
+        when (val b = prop.binding) {
+            is Binding.Element -> b.name.localPart
+            is Binding.Attribute -> "@${b.name}"
+            else -> prop.name
+        }
 }
 
 /** Like [NameRegistry.claim], but gives up instead of numbering: helpers are optional. */

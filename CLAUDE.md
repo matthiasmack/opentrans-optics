@@ -10,8 +10,10 @@ in git.
 
 ## Commands
 
-- `./gradlew build`: generates the code, compiles and runs all tests. Run it before saying a
-  change works.
+- `./gradlew build`: generates the code, compiles, checks the formatting (ktlint) and runs all
+  tests. Run it before saying a change works.
+- `./gradlew ktlintFormat`: formats all hand-written Kotlin. Rules are in `.editorconfig`
+  (ktlint_official, 140 characters); generated code is excluded.
 - `./gradlew :opentrans-optics-model:generateModel` (also `:opentrans-optics-xml:generateXml`,
   `:opentrans-optics-dsl:generateDsl`): regenerates one module's code. The output goes to
   `<module>/build/generated/opentrans/kotlin`.
@@ -29,8 +31,8 @@ JDK 25, Kotlin, Gradle wrapper, versions in `gradle/libs.versions.toml`.
   - `Names.kt` holds all naming rules and the override tables.
 - All Kotlin code lives under the package `io.github.matthiasmack.opentrans` (directories
   `io/github/matthiasmack/opentrans/...`). Below, packages are named relative to it.
-- `opentrans-optics-model/`: the generated model in `.model`. Hand-written there: `Types.kt`
-  (`DateTime`), `Facets.kt`, `XmlContent.kt` (free XML tree), `.udx` (UdxType API) and `.itscope`
+- `opentrans-optics-model/`: the generated model in `.model`. Hand-written there: `DateTime.kt`,
+  `Facets.kt`, `XmlContent.kt` (free XML tree), `.udx` (UdxType API) and `.itscope`
   (ITscope's UDX, `ItScopeRules`).
 - `opentrans-optics-xml/`: the generated reader and writer (internal). Hand-written: `XmlIn`, `XmlOut`,
   `OpenTransSchema` (validation profiles, hardening) and `OpenTransXml` (public API). The XSDs are

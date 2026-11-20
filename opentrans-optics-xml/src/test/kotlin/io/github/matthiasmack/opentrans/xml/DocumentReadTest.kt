@@ -16,7 +16,6 @@ import kotlin.test.assertIs
 
 /** The reader generated from the XSD reads every official sample completely. */
 class DocumentReadTest {
-
     private fun read(name: String): OpenTransDocument = OpenTransXml.read(javaClass.getResource("/samples/$name")!!.readText())
 
     @Test
@@ -29,7 +28,16 @@ class DocumentReadTest {
         assertEquals("ReferencetoQuotationNr", order.orderHeader.sourcingInfo?.quotationId)
         assertEquals(listOf(PartyRole.BUYER), info.parties.single().partyRoles)
         assertEquals("VISA", assertIs<Card>(info.payment?.method).type)
-        assertEquals(2, info.parties.single().addresses.single().contactDetails.single().contactNames.size)
+        assertEquals(
+            2,
+            info.parties
+                .single()
+                .addresses
+                .single()
+                .contactDetails
+                .single()
+                .contactNames.size,
+        )
         assertContains(info.headerUdx!!.text, "user defined extension on header-level")
         assertEquals(order.orderSummary.totalItemNum, order.orderItems.size)
     }

@@ -6,7 +6,6 @@ import kotlin.test.assertEquals
 
 /** Every sample survives read -> write -> validate -> read, and writing is stable. */
 class DocumentRoundTripTest {
-
     @ParameterizedTest
     @ValueSource(strings = ["order.xml", "invoice.xml", "dispatchnotification.xml", "invoicelist.xml", "order-spike.xml"])
     fun `sample survives a round trip`(sample: String) {

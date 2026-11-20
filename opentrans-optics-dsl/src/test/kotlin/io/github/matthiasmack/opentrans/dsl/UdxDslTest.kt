@@ -18,7 +18,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class UdxDslTest {
-
     @Test
     fun `typed UDX in the DSL gives the same content as the XML text`() {
         assertEquals(spikeOrder.orderHeader.orderInfo.headerUdx, udx { add(ProjectUdx, Project("project-7", Priority(Level.HIGH))) })
@@ -26,12 +25,13 @@ class UdxDslTest {
 
     @Test
     fun `typed UDX, XML text and plain elements keep their order`() {
-        val content = udx {
-            xml("""<UDX.OTHER xmlns="urn:partner">kept</UDX.OTHER>""")
-            add(CostCenterUdx, CostCenter("cc-1"))
-            element(XmlElement("UDX.PLAIN"))
-            text("tail")
-        }
+        val content =
+            udx {
+                xml("""<UDX.OTHER xmlns="urn:partner">kept</UDX.OTHER>""")
+                add(CostCenterUdx, CostCenter("cc-1"))
+                element(XmlElement("UDX.PLAIN"))
+                text("tail")
+            }
         assertEquals(
             listOf("UDX.OTHER", "UDX.CUSTOM", "UDX.PLAIN"),
             content.elements.map { it.name.localPart },
@@ -42,14 +42,18 @@ class UdxDslTest {
 
     @Test
     fun `generated builders offer a UDX block for every UDX property`() {
-        val item = OrderItem {
-            lineItemId = "1"
-            productId { supplierPid("SKU-1") }
-            quantity(2)
-            orderUnit = "C62"
-            itemUdx { add(CostCenterUdx, CostCenter("cc-42")) }
-        }
-        assertEquals(XmlContent.parse("""<UDX.CUSTOM xmlns="urn:example:udx"><COST_CENTER>cc-42</COST_CENTER></UDX.CUSTOM>"""), item.itemUdx)
+        val item =
+            OrderItem {
+                lineItemId = "1"
+                productId { supplierPid("SKU-1") }
+                quantity(2)
+                orderUnit = "C62"
+                itemUdx { add(CostCenterUdx, CostCenter("cc-42")) }
+            }
+        assertEquals(
+            XmlContent.parse("""<UDX.CUSTOM xmlns="urn:example:udx"><COST_CENTER>cc-42</COST_CENTER></UDX.CUSTOM>"""),
+            item.itemUdx,
+        )
     }
 
     @Test

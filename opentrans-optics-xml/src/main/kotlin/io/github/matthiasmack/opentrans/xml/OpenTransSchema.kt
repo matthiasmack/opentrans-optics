@@ -24,7 +24,9 @@ import javax.xml.validation.SchemaFactory
  * official one: every valid openTRANS 2.1 document is also valid for ITscope.
  * [OPENTRANS] is for partners outside ITscope that expect the official schema.
  */
-enum class Profile(internal val directory: String) {
+enum class Profile(
+    internal val directory: String,
+) {
     /** ITscope's extended openTRANS 2.1, the default. */
     ITSCOPE("itscope"),
 
@@ -49,14 +51,18 @@ object OpenTransSchema {
     fun schema(profile: Profile = Profile.ITSCOPE): Schema = schemas.getValue(profile).value
 
     /** Validates [xml] against [profile] and throws [OpenTransValidationException] listing all errors. */
-    fun validate(xml: String, profile: Profile = Profile.ITSCOPE) {
+    fun validate(
+        xml: String,
+        profile: Profile = Profile.ITSCOPE,
+    ) {
         rejectDoctype(xml)
         val errors = mutableListOf<String>()
-        val validator = schema(profile).newValidator().apply {
-            setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "")
-            setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "")
-            errorHandler = CollectingErrorHandler(errors)
-        }
+        val validator =
+            schema(profile).newValidator().apply {
+                setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "")
+                setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "")
+                errorHandler = CollectingErrorHandler(errors)
+            }
         try {
             validator.validate(StreamSource(StringReader(xml)))
         } catch (e: SAXParseException) {
@@ -90,23 +96,28 @@ object OpenTransSchema {
         }
     }
 
-    private val prologFactory: XMLInputFactory = XMLInputFactory.newFactory().apply {
-        setProperty(XMLInputFactory.SUPPORT_DTD, false)
-        setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false)
-    }
+    private val prologFactory: XMLInputFactory =
+        XMLInputFactory.newFactory().apply {
+            setProperty(XMLInputFactory.SUPPORT_DTD, false)
+            setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false)
+        }
 
     private fun load(profile: Profile): Schema {
         val directory = BASE + profile.directory + "/"
-        val factory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI).apply {
-            setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
-            setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "")
-            setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "")
-            resourceResolver = ClasspathResolver(directory)
-        }
+        val factory =
+            SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI).apply {
+                setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
+                setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "")
+                setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "")
+                resourceResolver = ClasspathResolver(directory)
+            }
         return factory.newSchema(StreamSource(resource(directory, ROOT), ROOT))
     }
 
-    private fun resource(directory: String, name: String): InputStream =
+    private fun resource(
+        directory: String,
+        name: String,
+    ): InputStream =
         OpenTransSchema::class.java.getResourceAsStream(directory + name)
             ?: error("Bundled schema file missing: $directory$name")
 
@@ -115,20 +126,28 @@ object OpenTransSchema {
      * xmldsig-core-schema.xsd only declares entities the schema never uses,
      * so it is answered with an empty document instead of being downloaded.
      */
-    private class ClasspathResolver(private val directory: String) : LSResourceResolver {
+    private class ClasspathResolver(
+        private val directory: String,
+    ) : LSResourceResolver {
         private val bundled = setOf("bmecat_2005.xsd", "xmlmime.xsd", "xmldsig-core-schema.xsd")
 
         override fun resolveResource(
-            type: String?, namespaceURI: String?, publicId: String?, systemId: String?, baseURI: String?,
+            type: String?,
+            namespaceURI: String?,
+            publicId: String?,
+            systemId: String?,
+            baseURI: String?,
         ): LSInput {
             val name = systemId?.substringAfterLast('/')
             return when {
                 name in bundled -> {
                     Input(publicId, name, resource(directory, name!!))
                 }
+
                 type == "http://www.w3.org/TR/REC-xml" -> {
                     Input(publicId, systemId, InputStream.nullInputStream())
                 }
+
                 else -> {
                     throw IllegalStateException("Refusing to load external resource: $systemId")
                 }
@@ -142,26 +161,53 @@ object OpenTransSchema {
         private var stream: InputStream?,
     ) : LSInput {
         override fun getByteStream() = stream
-        override fun setByteStream(byteStream: InputStream?) { stream = byteStream }
+
+        override fun setByteStream(byteStream: InputStream?) {
+            stream = byteStream
+        }
+
         override fun getPublicId() = publicId
-        override fun setPublicId(publicId: String?) { this.publicId = publicId }
+
+        override fun setPublicId(publicId: String?) {
+            this.publicId = publicId
+        }
+
         override fun getSystemId() = systemId
-        override fun setSystemId(systemId: String?) { this.systemId = systemId }
+
+        override fun setSystemId(systemId: String?) {
+            this.systemId = systemId
+        }
+
         override fun getCharacterStream(): Reader? = null
+
         override fun setCharacterStream(characterStream: Reader?) = Unit
+
         override fun getStringData(): String? = null
+
         override fun setStringData(stringData: String?) = Unit
+
         override fun getBaseURI(): String? = null
+
         override fun setBaseURI(baseURI: String?) = Unit
+
         override fun getEncoding(): String? = null
+
         override fun setEncoding(encoding: String?) = Unit
+
         override fun getCertifiedText() = false
+
         override fun setCertifiedText(certifiedText: Boolean) = Unit
     }
 
-    private class CollectingErrorHandler(private val errors: MutableList<String>) : ErrorHandler {
+    private class CollectingErrorHandler(
+        private val errors: MutableList<String>,
+    ) : ErrorHandler {
         override fun warning(e: SAXParseException) = Unit
-        override fun error(e: SAXParseException) { errors += e.describe() }
+
+        override fun error(e: SAXParseException) {
+            errors += e.describe()
+        }
+
         override fun fatalError(e: SAXParseException) = throw e
     }
 

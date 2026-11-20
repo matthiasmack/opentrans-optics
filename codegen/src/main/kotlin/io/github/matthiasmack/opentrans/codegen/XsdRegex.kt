@@ -33,8 +33,14 @@ object XsdRegex {
                     i += 2
                     continue
                 }
-                c == '[' -> inClass++
-                c == ']' && inClass > 0 -> inClass--
+
+                c == '[' -> {
+                    inClass++
+                }
+
+                c == ']' && inClass > 0 -> {
+                    inClass--
+                }
             }
             out.append(c)
             i++

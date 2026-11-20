@@ -38,7 +38,9 @@ import javax.xml.namespace.QName
  *   declares a [text] field, possibly next to attributes; [UdxType.value]
  *   creates such a type in one line.
  */
-abstract class UdxType<T>(val name: QName) : UdxValueType<T> {
+abstract class UdxType<T>(
+    val name: QName,
+) : UdxValueType<T> {
     constructor(localName: String, namespace: String = "") : this(QName(namespace, localName))
 
     private val fields = mutableListOf<Field<T, *>>()
@@ -47,7 +49,9 @@ abstract class UdxType<T>(val name: QName) : UdxValueType<T> {
     protected abstract fun create(v: Values): T
 
     /** The values read for one element, looked up by field. */
-    class Values internal constructor(private val values: Map<Field<*, *>, Any?>) {
+    class Values internal constructor(
+        private val values: Map<Field<*, *>, Any?>,
+    ) {
         @Suppress("UNCHECKED_CAST")
         operator fun <V> get(field: Field<*, V>): V = values.getValue(field) as V
     }
@@ -67,50 +71,85 @@ abstract class UdxType<T>(val name: QName) : UdxValueType<T> {
     }
 
     /** Child element that must occur exactly once. */
-    protected fun <V> required(name: String, get: (T) -> V, type: UdxValueType<V>): Field<T, V> =
-        add(Field(name, Field.Kind.ELEMENT, get, type, 1, 1))
+    protected fun <V> required(
+        name: String,
+        get: (T) -> V,
+        type: UdxValueType<V>,
+    ): Field<T, V> = add(Field(name, Field.Kind.ELEMENT, get, type, 1, 1))
 
     /** Child element that may be missing; missing means `null`. */
-    protected fun <V : Any> optional(name: String, get: (T) -> V?, type: UdxValueType<V>): Field<T, V?> =
-        add(Field(name, Field.Kind.ELEMENT, get, type, 0, 1))
+    protected fun <V : Any> optional(
+        name: String,
+        get: (T) -> V?,
+        type: UdxValueType<V>,
+    ): Field<T, V?> = add(Field(name, Field.Kind.ELEMENT, get, type, 0, 1))
 
     /** Repeated child element, between [min] and [max] times (no upper limit when null). */
-    protected fun <V> list(name: String, get: (T) -> List<V>, type: UdxValueType<V>, min: Int = 0, max: Int? = null): Field<T, List<V>> {
+    protected fun <V> list(
+        name: String,
+        get: (T) -> List<V>,
+        type: UdxValueType<V>,
+        min: Int = 0,
+        max: Int? = null,
+    ): Field<T, List<V>> {
         require(min >= 0 && (max == null || max >= maxOf(min, 1))) { "$name: invalid repetition $min..$max" }
         return add(Field(name, Field.Kind.ELEMENT, get, type, min, max))
     }
 
     /** Attribute that must be present. */
-    protected fun <V> attribute(name: String, get: (T) -> V, type: SimpleType<V>): Field<T, V> =
-        add(Field(name, Field.Kind.ATTRIBUTE, get, type, 1, 1))
+    protected fun <V> attribute(
+        name: String,
+        get: (T) -> V,
+        type: SimpleType<V>,
+    ): Field<T, V> = add(Field(name, Field.Kind.ATTRIBUTE, get, type, 1, 1))
 
     /** Attribute that may be missing; missing means `null`. */
-    protected fun <V : Any> optionalAttribute(name: String, get: (T) -> V?, type: SimpleType<V>): Field<T, V?> =
-        add(Field(name, Field.Kind.ATTRIBUTE, get, type, 0, 1))
+    protected fun <V : Any> optionalAttribute(
+        name: String,
+        get: (T) -> V?,
+        type: SimpleType<V>,
+    ): Field<T, V?> = add(Field(name, Field.Kind.ATTRIBUTE, get, type, 0, 1))
 
     /**
      * The element's own text: `<UDX.DROPSHIPMENT>true</UDX.DROPSHIPMENT>`. Can be
      * combined with attributes, not with child elements.
      */
-    protected fun <V> text(get: (T) -> V, type: SimpleType<V>): Field<T, V> =
-        add(Field("#text", Field.Kind.TEXT, get, type, 1, 1))
+    protected fun <V> text(
+        get: (T) -> V,
+        type: SimpleType<V>,
+    ): Field<T, V> = add(Field("#text", Field.Kind.TEXT, get, type, 1, 1))
 
     private fun <V> add(field: Field<T, V>): Field<T, V> {
-        require(fields.none { it.localName == field.localName && it.kind == field.kind }) { "${name.localPart}: ${field.localName} is declared twice" }
+        require(
+            fields.none {
+                it.localName == field.localName && it.kind == field.kind
+            },
+        ) { "${name.localPart}: ${field.localName} is declared twice" }
         val kinds = (fields.map { it.kind } + field.kind).toSet()
-        require(!(Field.Kind.TEXT in kinds && Field.Kind.ELEMENT in kinds)) { "${name.localPart}: text and child elements cannot be combined" }
+        require(
+            !(Field.Kind.TEXT in kinds && Field.Kind.ELEMENT in kinds),
+        ) { "${name.localPart}: text and child elements cannot be combined" }
         fields += field
         return field
     }
 
     // --- simple types, for use in field declarations ---
 
-    protected fun string(minLength: Int? = null, maxLength: Int? = null, pattern: Regex? = null): SimpleType<String> =
-        SimpleTypes.string(minLength, maxLength, pattern)
+    protected fun string(
+        minLength: Int? = null,
+        maxLength: Int? = null,
+        pattern: Regex? = null,
+    ): SimpleType<String> = SimpleTypes.string(minLength, maxLength, pattern)
 
-    protected fun int(min: Int? = null, max: Int? = null): SimpleType<Int> = SimpleTypes.int(min, max)
+    protected fun int(
+        min: Int? = null,
+        max: Int? = null,
+    ): SimpleType<Int> = SimpleTypes.int(min, max)
 
-    protected fun decimal(min: BigDecimal? = null, max: BigDecimal? = null): SimpleType<BigDecimal> = SimpleTypes.decimal(min, max)
+    protected fun decimal(
+        min: BigDecimal? = null,
+        max: BigDecimal? = null,
+    ): SimpleType<BigDecimal> = SimpleTypes.decimal(min, max)
 
     /** `true` / `false`, read in any case like bmecat:dtBOOLEAN. */
     protected fun boolean(): SimpleType<Boolean> = SimpleTypes.boolean()
@@ -124,7 +163,10 @@ abstract class UdxType<T>(val name: QName) : UdxValueType<T> {
     /** Enum written as [xml] of each constant (its name by default). */
     protected inline fun <reified E : Enum<E>> enum(noinline xml: (E) -> String = { it.name }): SimpleType<E> = SimpleTypes.enum(xml)
 
-    protected fun <E : Enum<E>> enumType(values: List<E>, xml: (E) -> String): SimpleType<E> = SimpleTypes.enumType(values, xml)
+    protected fun <E : Enum<E>> enumType(
+        values: List<E>,
+        xml: (E) -> String,
+    ): SimpleType<E> = SimpleTypes.enumType(values, xml)
 
     // --- reading and writing ---
 
@@ -134,7 +176,11 @@ abstract class UdxType<T>(val name: QName) : UdxValueType<T> {
      * @throws UdxViolationException if the element does not match this type
      */
     fun read(element: XmlElement): T {
-        if (element.name != name) throw UdxViolationException("${element.name.localPart}: expected ${name.localPart} in namespace '${name.namespaceURI}'")
+        if (element.name !=
+            name
+        ) {
+            throw UdxViolationException("${element.name.localPart}: expected ${name.localPart} in namespace '${name.namespaceURI}'")
+        }
         return readBody(element, name.localPart)
     }
 
@@ -145,43 +191,60 @@ abstract class UdxType<T>(val name: QName) : UdxValueType<T> {
      */
     fun write(value: T): XmlElement = writeBody(name, value, name.localPart)
 
-    internal fun readBody(element: XmlElement, path: String): T {
+    internal fun readBody(
+        element: XmlElement,
+        path: String,
+    ): T {
         val ns = element.name.namespaceURI
         val elementFields = fields.filter { it.kind == Field.Kind.ELEMENT }.associateBy { QName(ns, it.localName) }
         val attributeFields = fields.filter { it.kind == Field.Kind.ATTRIBUTE }.associateBy { QName(it.localName) }
 
-        element.elements.firstOrNull { it.name !in elementFields }?.let { throw UdxViolationException("$path: unknown element ${it.name.localPart}") }
-        element.attributes.keys.firstOrNull { it !in attributeFields }?.let { throw UdxViolationException("$path: unknown attribute ${it.localPart}") }
+        element.elements
+            .firstOrNull {
+                it.name !in elementFields
+            }?.let { throw UdxViolationException("$path: unknown element ${it.name.localPart}") }
+        element.attributes.keys
+            .firstOrNull {
+                it !in attributeFields
+            }?.let { throw UdxViolationException("$path: unknown attribute ${it.localPart}") }
         val hasText = fields.any { it.kind == Field.Kind.TEXT }
-        if (!hasText && element.text.isNotBlank()) throw UdxViolationException("$path: text is not allowed here, got '${element.text.trim()}'")
+        if (!hasText &&
+            element.text.isNotBlank()
+        ) {
+            throw UdxViolationException("$path: text is not allowed here, got '${element.text.trim()}'")
+        }
 
         val values = HashMap<Field<*, *>, Any?>()
         for (field in fields) {
-            val fieldPath = when (field.kind) {
-                Field.Kind.ATTRIBUTE -> "$path/@${field.localName}"
-                Field.Kind.TEXT -> path
-                Field.Kind.ELEMENT -> "$path/${field.localName}"
-            }
-            values[field] = when (field.kind) {
-                Field.Kind.TEXT -> {
-                    if (element.text.isBlank()) throw UdxViolationException("$path: a value is missing")
-                    (field.type as SimpleType<*>).parse(element.text, path)
+            val fieldPath =
+                when (field.kind) {
+                    Field.Kind.ATTRIBUTE -> "$path/@${field.localName}"
+                    Field.Kind.TEXT -> path
+                    Field.Kind.ELEMENT -> "$path/${field.localName}"
                 }
-                Field.Kind.ATTRIBUTE -> {
-                    val text = element.attribute(field.localName)
-                    when {
-                        text != null -> (field.type as SimpleType<*>).parse(text, fieldPath)
-                        field.min == 1 -> throw UdxViolationException("$fieldPath is missing")
-                        else -> null
+            values[field] =
+                when (field.kind) {
+                    Field.Kind.TEXT -> {
+                        if (element.text.isBlank()) throw UdxViolationException("$path: a value is missing")
+                        (field.type as SimpleType<*>).parse(element.text, path)
+                    }
+
+                    Field.Kind.ATTRIBUTE -> {
+                        val text = element.attribute(field.localName)
+                        when {
+                            text != null -> (field.type as SimpleType<*>).parse(text, fieldPath)
+                            field.min == 1 -> throw UdxViolationException("$fieldPath is missing")
+                            else -> null
+                        }
+                    }
+
+                    Field.Kind.ELEMENT -> {
+                        val children = element.elements.filter { it.name == QName(ns, field.localName) }
+                        checkCount(field, children.size, fieldPath)
+                        val read = children.map { readValue(field.type, it, fieldPath) }
+                        if (field.max == 1) read.singleOrNull() else read
                     }
                 }
-                Field.Kind.ELEMENT -> {
-                    val children = element.elements.filter { it.name == QName(ns, field.localName) }
-                    checkCount(field, children.size, fieldPath)
-                    val read = children.map { readValue(field.type, it, fieldPath) }
-                    if (field.max == 1) read.singleOrNull() else read
-                }
-            }
         }
         return try {
             create(Values(values))
@@ -195,19 +258,32 @@ abstract class UdxType<T>(val name: QName) : UdxValueType<T> {
         }
     }
 
-    internal fun writeBody(elementName: QName, value: T, path: String): XmlElement {
+    internal fun writeBody(
+        elementName: QName,
+        value: T,
+        path: String,
+    ): XmlElement {
         val ns = elementName.namespaceURI
         val attributes = LinkedHashMap<QName, String>()
         val children = mutableListOf<XmlNode>()
         for (field in fields) {
             val fieldValue = field.get(value)
             when (field.kind) {
-                Field.Kind.TEXT -> children += XmlText(formatValue(field.type as SimpleType<*>, fieldValue, path))
+                Field.Kind.TEXT -> {
+                    children += XmlText(formatValue(field.type as SimpleType<*>, fieldValue, path))
+                }
+
                 Field.Kind.ATTRIBUTE -> {
                     val fieldPath = "$path/@${field.localName}"
-                    if (fieldValue != null) attributes[QName(field.localName)] = formatValue(field.type as SimpleType<*>, fieldValue, fieldPath)
-                    else if (field.min == 1) throw UdxViolationException("$fieldPath is missing")
+                    if (fieldValue !=
+                        null
+                    ) {
+                        attributes[QName(field.localName)] = formatValue(field.type as SimpleType<*>, fieldValue, fieldPath)
+                    } else if (field.min == 1) {
+                        throw UdxViolationException("$fieldPath is missing")
+                    }
                 }
+
                 Field.Kind.ELEMENT -> {
                     val fieldPath = "$path/${field.localName}"
                     val items = if (field.max == 1) listOfNotNull(fieldValue) else fieldValue as List<*>
@@ -220,29 +296,72 @@ abstract class UdxType<T>(val name: QName) : UdxValueType<T> {
         return XmlElement(elementName, attributes, children)
     }
 
-    private fun checkCount(field: Field<*, *>, count: Int, path: String) {
+    private fun checkCount(
+        field: Field<*, *>,
+        count: Int,
+        path: String,
+    ) {
         when {
-            count < field.min -> throw UdxViolationException(if (field.min == 1 && field.max == 1) "$path is missing" else "$path: at least ${field.min} times, got $count")
-            field.max != null && count > field.max -> throw UdxViolationException(if (field.max == 1) "$path: only once, got $count" else "$path: at most ${field.max} times, got $count")
+            count < field.min -> throw UdxViolationException(
+                if (field.min == 1 &&
+                    field.max == 1
+                ) {
+                    "$path is missing"
+                } else {
+                    "$path: at least ${field.min} times, got $count"
+                },
+            )
+
+            field.max != null && count > field.max -> throw UdxViolationException(
+                if (field.max ==
+                    1
+                ) {
+                    "$path: only once, got $count"
+                } else {
+                    "$path: at most ${field.max} times, got $count"
+                },
+            )
         }
     }
 
-    private fun readValue(type: UdxValueType<*>, element: XmlElement, path: String): Any? = when (type) {
-        is SimpleType<*> -> {
-            if (element.elements.isNotEmpty() || element.attributes.isNotEmpty()) throw UdxViolationException("$path: only text is allowed here")
-            type.parse(element.text, path)
+    private fun readValue(
+        type: UdxValueType<*>,
+        element: XmlElement,
+        path: String,
+    ): Any? =
+        when (type) {
+            is SimpleType<*> -> {
+                if (element.elements.isNotEmpty() ||
+                    element.attributes.isNotEmpty()
+                ) {
+                    throw UdxViolationException("$path: only text is allowed here")
+                }
+                type.parse(element.text, path)
+            }
+
+            is UdxType<*> -> {
+                type.readBody(element, path)
+            }
         }
-        is UdxType<*> -> type.readBody(element, path)
-    }
 
     @Suppress("UNCHECKED_CAST")
-    private fun writeValue(type: UdxValueType<*>, name: QName, value: Any?, path: String): XmlElement = when (type) {
-        is SimpleType<*> -> XmlElement(name, children = listOf(XmlText(formatValue(type, value, path))))
-        is UdxType<*> -> (type as UdxType<Any?>).writeBody(name, value, path)
-    }
+    private fun writeValue(
+        type: UdxValueType<*>,
+        name: QName,
+        value: Any?,
+        path: String,
+    ): XmlElement =
+        when (type) {
+            is SimpleType<*> -> XmlElement(name, children = listOf(XmlText(formatValue(type, value, path))))
+            is UdxType<*> -> (type as UdxType<Any?>).writeBody(name, value, path)
+        }
 
     @Suppress("UNCHECKED_CAST")
-    private fun formatValue(type: SimpleType<*>, value: Any?, path: String): String = (type as SimpleType<Any?>).format(value, path)
+    private fun formatValue(
+        type: SimpleType<*>,
+        value: Any?,
+        path: String,
+    ): String = (type as SimpleType<Any?>).format(value, path)
 
     override fun toString() = "UdxType(${name.localPart})"
 
@@ -251,9 +370,14 @@ abstract class UdxType<T>(val name: QName) : UdxValueType<T> {
          * A UDX element that holds just a value, e.g.
          * `val DROPSHIPMENT = UdxType.value("UDX.DROPSHIPMENT", SimpleTypes.boolean())`.
          */
-        fun <V> value(localName: String, type: SimpleType<V>, namespace: String = ""): UdxType<V> =
+        fun <V> value(
+            localName: String,
+            type: SimpleType<V>,
+            namespace: String = "",
+        ): UdxType<V> =
             object : UdxType<V>(localName, namespace) {
                 private val value = text({ it }, type)
+
                 override fun create(v: Values): V = v[value]
             }
     }
@@ -265,7 +389,11 @@ abstract class UdxType<T>(val name: QName) : UdxValueType<T> {
  * available without the prefix.
  */
 object SimpleTypes {
-    fun string(minLength: Int? = null, maxLength: Int? = null, pattern: Regex? = null): SimpleType<String> =
+    fun string(
+        minLength: Int? = null,
+        maxLength: Int? = null,
+        pattern: Regex? = null,
+    ): SimpleType<String> =
         SimpleType("string", { it }, { it }) { value ->
             val length = value.codePointCount(0, value.length)
             when {
@@ -276,7 +404,10 @@ object SimpleTypes {
             }
         }
 
-    fun int(min: Int? = null, max: Int? = null): SimpleType<Int> =
+    fun int(
+        min: Int? = null,
+        max: Int? = null,
+    ): SimpleType<Int> =
         SimpleType("integer", { it.trim().toInt() }, Int::toString) { value ->
             when {
                 min != null && value < min -> "at least $min, got $value"
@@ -285,7 +416,10 @@ object SimpleTypes {
             }
         }
 
-    fun decimal(min: BigDecimal? = null, max: BigDecimal? = null): SimpleType<BigDecimal> =
+    fun decimal(
+        min: BigDecimal? = null,
+        max: BigDecimal? = null,
+    ): SimpleType<BigDecimal> =
         SimpleType("decimal", { BigDecimal(it.trim()) }, BigDecimal::toPlainString) { value ->
             when {
                 min != null && value < min -> "at least $min, got $value"
@@ -295,13 +429,14 @@ object SimpleTypes {
         }
 
     /** `true` / `false`, read in any case like bmecat:dtBOOLEAN. */
-    fun boolean(): SimpleType<Boolean> = SimpleType("boolean", {
-        when (it.trim().lowercase()) {
-            "true" -> true
-            "false" -> false
-            else -> throw IllegalArgumentException("'$it' is not true or false")
-        }
-    }, Boolean::toString)
+    fun boolean(): SimpleType<Boolean> =
+        SimpleType("boolean", {
+            when (it.trim().lowercase()) {
+                "true" -> true
+                "false" -> false
+                else -> throw IllegalArgumentException("'$it' is not true or false")
+            }
+        }, Boolean::toString)
 
     /** ISO date, `2026-11-17`. */
     fun date(): SimpleType<LocalDate> = SimpleType("date", { LocalDate.parse(it.trim()) }, LocalDate::toString)
@@ -313,9 +448,16 @@ object SimpleTypes {
     inline fun <reified E : Enum<E>> enum(noinline xml: (E) -> String = { it.name }): SimpleType<E> =
         enumType(enumValues<E>().toList(), xml)
 
-    fun <E : Enum<E>> enumType(values: List<E>, xml: (E) -> String): SimpleType<E> {
+    fun <E : Enum<E>> enumType(
+        values: List<E>,
+        xml: (E) -> String,
+    ): SimpleType<E> {
         val byXml = values.associateBy(xml)
-        return SimpleType("one of ${byXml.keys}", { byXml[it.trim()] ?: throw IllegalArgumentException("'$it' is not one of ${byXml.keys}") }, xml)
+        return SimpleType(
+            "one of ${byXml.keys}",
+            { byXml[it.trim()] ?: throw IllegalArgumentException("'$it' is not one of ${byXml.keys}") },
+            xml,
+        )
     }
 }
 
@@ -335,22 +477,31 @@ class SimpleType<V>(
     private val format: (V) -> String,
     private val check: (V) -> String? = { null },
 ) : UdxValueType<V> {
-
-    internal fun parse(text: String, path: String): V {
-        val value = try {
-            parse(text)
-        } catch (e: RuntimeException) {
-            throw UdxViolationException("$path: '$text' is not a valid $description", e)
-        }
+    internal fun parse(
+        text: String,
+        path: String,
+    ): V {
+        val value =
+            try {
+                parse(text)
+            } catch (e: RuntimeException) {
+                throw UdxViolationException("$path: '$text' is not a valid $description", e)
+            }
         check(value)?.let { throw UdxViolationException("$path: $it") }
         return value
     }
 
-    internal fun format(value: V, path: String): String {
+    internal fun format(
+        value: V,
+        path: String,
+    ): String {
         check(value)?.let { throw UdxViolationException("$path: $it") }
         return format(value)
     }
 }
 
 /** A UDX element or value that breaks a rule of its [UdxType]; the message starts with the path. */
-class UdxViolationException(message: String, cause: Throwable? = null) : OpenTransException(message, cause)
+class UdxViolationException(
+    message: String,
+    cause: Throwable? = null,
+) : OpenTransException(message, cause)

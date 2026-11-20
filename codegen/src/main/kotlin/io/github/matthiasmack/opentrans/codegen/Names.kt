@@ -13,108 +13,112 @@ package io.github.matthiasmack.opentrans.codegen
 
 object Names {
     /** Class / enum / choice names. */
-    private val classOverrides = mapOf(
-        "dtMLSTRING" to "MlString",
-        "typePARTY_ID" to "PartyId",
-        "REMARKS" to "Remark",
-        "PAYMENT#1" to "PaymentMethod",
-        "TIME_FOR_PAYMENT#1" to "PaymentDue",
-        "TIME_FOR_PAYMENT#2" to "PaymentDiscount",
-        // bmecat:DATETIME (DATE, TIME, TIMEZONE + type) would clash with the hand-written DateTime.
-        "DATETIME" to "DatetimeElement",
-        // FEATURE: (FNAME+ | FT_IDREF | FTEMPLATE), (FVALUE+ | VALUE_IDREF+)
-        "FEATURE#1" to "FeatureName",
-        "FEATURE#2" to "FeatureValue",
-        // The type gets the descriptive name, so the FTEMPLATE choice wrapper keeps the element name.
-        "typeFTEMPLATE" to "FeatureTemplate",
-        // PRODUCT_PRICE: (PRICE_AMOUNT | PRICE_FORMULA), (TAX | TAX_DETAILS+), (TERRITORY+ | AREA_REFS)
-        "PRODUCT_PRICE#1" to "ProductPriceValue",
-        "PRODUCT_PRICE#2" to "ProductPriceTax",
-        "PRODUCT_PRICE#3" to "ProductPriceTerritory",
-        "CUSTOMS_TARIFF_NUMBER#1" to "CustomsTariffTerritory",
-        // Items: ((PARTIAL_SHIPMENT_ALLOWED?, DELIVERY_DATE?) | DELIVERY_DATE | PARTIAL_DELIVERY_LIST)
-        "ORDER_ITEM#1" to "OrderItemDelivery",
-        "ORDER_ITEM#1/PARTIAL_SHIPMENT_ALLOWED..." to "SingleDelivery",
-        "ORDERRESPONSE_ITEM#1" to "OrderResponseItemDelivery",
-        "QUOTATION_ITEM#1" to "QuotationItemDelivery",
-        // bmecat:PRODUCT_PRICE_DETAILS: (DATETIME+ | (VALID_START_DATE?, VALID_END_DATE?))
-        "PRODUCT_PRICE_DETAILS#1" to "PriceValidity",
-        "PRODUCT_PRICE_DETAILS#1/VALID_START_DATE..." to "ValidityPeriod",
-        // MIME: ((MIME_SOURCE+, FILE_HASH_VALUE*) | MIME_EMBEDDED+)
-        "MIME#1" to "MimeContent",
-        "MIME#1/MIME_SOURCE..." to "MimeSources",
-        "MIME_EMBEDDED+" to "MimeEmbeddedList",
-        // ITscope adds an openTRANS PARAMETER (CONTRACT_INFORMATION); BMEcat's PARAMETER keeps its name.
-        "opentrans:PARAMETER" to "ContractParameter",
-        "bmecat:PARAMETER" to "Parameter",
-    )
+    private val classOverrides =
+        mapOf(
+            "dtMLSTRING" to "MlString",
+            "typePARTY_ID" to "PartyId",
+            "REMARKS" to "Remark",
+            "PAYMENT#1" to "PaymentMethod",
+            "TIME_FOR_PAYMENT#1" to "PaymentDue",
+            "TIME_FOR_PAYMENT#2" to "PaymentDiscount",
+            // bmecat:DATETIME (DATE, TIME, TIMEZONE + type) would clash with the hand-written DateTime.
+            "DATETIME" to "DatetimeElement",
+            // FEATURE: (FNAME+ | FT_IDREF | FTEMPLATE), (FVALUE+ | VALUE_IDREF+)
+            "FEATURE#1" to "FeatureName",
+            "FEATURE#2" to "FeatureValue",
+            // The type gets the descriptive name, so the FTEMPLATE choice wrapper keeps the element name.
+            "typeFTEMPLATE" to "FeatureTemplate",
+            // PRODUCT_PRICE: (PRICE_AMOUNT | PRICE_FORMULA), (TAX | TAX_DETAILS+), (TERRITORY+ | AREA_REFS)
+            "PRODUCT_PRICE#1" to "ProductPriceValue",
+            "PRODUCT_PRICE#2" to "ProductPriceTax",
+            "PRODUCT_PRICE#3" to "ProductPriceTerritory",
+            "CUSTOMS_TARIFF_NUMBER#1" to "CustomsTariffTerritory",
+            // Items: ((PARTIAL_SHIPMENT_ALLOWED?, DELIVERY_DATE?) | DELIVERY_DATE | PARTIAL_DELIVERY_LIST)
+            "ORDER_ITEM#1" to "OrderItemDelivery",
+            "ORDER_ITEM#1/PARTIAL_SHIPMENT_ALLOWED..." to "SingleDelivery",
+            "ORDERRESPONSE_ITEM#1" to "OrderResponseItemDelivery",
+            "QUOTATION_ITEM#1" to "QuotationItemDelivery",
+            // bmecat:PRODUCT_PRICE_DETAILS: (DATETIME+ | (VALID_START_DATE?, VALID_END_DATE?))
+            "PRODUCT_PRICE_DETAILS#1" to "PriceValidity",
+            "PRODUCT_PRICE_DETAILS#1/VALID_START_DATE..." to "ValidityPeriod",
+            // MIME: ((MIME_SOURCE+, FILE_HASH_VALUE*) | MIME_EMBEDDED+)
+            "MIME#1" to "MimeContent",
+            "MIME#1/MIME_SOURCE..." to "MimeSources",
+            "MIME_EMBEDDED+" to "MimeEmbeddedList",
+            // ITscope adds an openTRANS PARAMETER (CONTRACT_INFORMATION); BMEcat's PARAMETER keeps its name.
+            "opentrans:PARAMETER" to "ContractParameter",
+            "bmecat:PARAMETER" to "Parameter",
+        )
 
     /** Hand-written types in the model package; generated names must never collide with them. */
     val reserved = setOf("DateTime", "XmlContent", "XmlNode", "XmlElement", "XmlText")
 
     /** Property names, keyed by "OwnerClass.defaultName". */
-    private val propertyOverrides = mapOf(
-        "Payment.paymentMethod" to "method",
-        "TimeForPayment.paymentDue" to "due",
-        "TimeForPayment.paymentDiscount" to "discount",
-        // BMEcat abbreviates the feature fields (FNAME, FUNIT, ...); inside Feature the prefix says nothing.
-        "Feature.featureName" to "name",
-        "Feature.featureValue" to "value",
-        "Feature.funit" to "unit",
-        "Feature.forder" to "order",
-        "Feature.fdescrs" to "descriptions",
-        "Feature.fvalueDetails" to "valueDetails",
-        "Feature.fvalueType" to "valueType",
-        "ProductPrice.productPriceValue" to "value",
-        "ProductPrice.productPriceTax" to "tax",
-        "ProductPrice.productPriceTerritory" to "territory",
-        "CustomsTariffNumber.customsTariffTerritory" to "territory",
-        "OrderItem.orderItemDelivery" to "delivery",
-        "OrderResponseItem.orderResponseItemDelivery" to "delivery",
-        "QuotationItem.quotationItemDelivery" to "delivery",
-        "BmecatProductPriceDetails.priceValidity" to "validity",
-        "Mime.mimeContent" to "content",
-    )
+    private val propertyOverrides =
+        mapOf(
+            "Payment.paymentMethod" to "method",
+            "TimeForPayment.paymentDue" to "due",
+            "TimeForPayment.paymentDiscount" to "discount",
+            // BMEcat abbreviates the feature fields (FNAME, FUNIT, ...); inside Feature the prefix says nothing.
+            "Feature.featureName" to "name",
+            "Feature.featureValue" to "value",
+            "Feature.funit" to "unit",
+            "Feature.forder" to "order",
+            "Feature.fdescrs" to "descriptions",
+            "Feature.fvalueDetails" to "valueDetails",
+            "Feature.fvalueType" to "valueType",
+            "ProductPrice.productPriceValue" to "value",
+            "ProductPrice.productPriceTax" to "tax",
+            "ProductPrice.productPriceTerritory" to "territory",
+            "CustomsTariffNumber.customsTariffTerritory" to "territory",
+            "OrderItem.orderItemDelivery" to "delivery",
+            "OrderResponseItem.orderResponseItemDelivery" to "delivery",
+            "QuotationItem.quotationItemDelivery" to "delivery",
+            "BmecatProductPriceDetails.priceValidity" to "validity",
+            "Mime.mimeContent" to "content",
+        )
 
     /** Property names fixed in every class (plurals the simple rules get wrong). */
-    private val globalPropertyOverrides = mapOf(
-        "descriptionShorts" to "shortDescriptions",
-        "descriptionLongs" to "longDescriptions",
-        "timeForPayments" to "timesForPayment",
-        "countryOfOrigins" to "countriesOfOrigin",
-        "meansOfTransports" to "meansOfTransport",
-        "signatureAndVerifications" to "signaturesAndVerifications",
-    )
+    private val globalPropertyOverrides =
+        mapOf(
+            "descriptionShorts" to "shortDescriptions",
+            "descriptionLongs" to "longDescriptions",
+            "timeForPayments" to "timesForPayment",
+            "countryOfOrigins" to "countriesOfOrigin",
+            "meansOfTransports" to "meansOfTransport",
+            "signatureAndVerifications" to "signaturesAndVerifications",
+        )
 
     /**
      * XSD names that run words together, split for class and property names
      * (DISPATCHNOTIFICATION_ID -> dispatchNotificationId). XML names are unaffected.
      */
-    private val compoundWords = mapOf(
-        "DISPATCHNOTIFICATION" to "DISPATCH_NOTIFICATION",
-        "ORDERRESPONSE" to "ORDER_RESPONSE",
-        "ORDERCHANGE" to "ORDER_CHANGE",
-        "INVOICELIST" to "INVOICE_LIST",
-        "RECEIPTACKNOWLEDGEMENT" to "RECEIPT_ACKNOWLEDGEMENT",
-        "REMITTANCEADVICE" to "REMITTANCE_ADVICE",
-        "DOCEXCHANGE" to "DOC_EXCHANGE",
-        "DELIVERYNOTE" to "DELIVERY_NOTE",
-        "STARTVALUE" to "START_VALUE",
-        "ENDVALUE" to "END_VALUE",
-        "INTERVALTYPE" to "INTERVAL_TYPE",
-        "INTERVALVALUE" to "INTERVAL_VALUE",
-        "CONTENTTYPE" to "CONTENT_TYPE",
-        "XMLREPORT" to "XML_REPORT",
-        "BASE64BINARY" to "BASE64_BINARY",
-        "SHORTNAME" to "SHORT_NAME",
-        "SYMBOLREF" to "SYMBOL_REF",
-        "BOXNO" to "BOX_NO",
-        "ZIPBOX" to "ZIP_BOX",
-        "DESCR" to "DESCRIPTION",
-        "SERIALNUMBER" to "SERIAL_NUMBER",
-        "LASTUPDATE" to "LAST_UPDATE",
-        "RECURRINGTYPE" to "RECURRING_TYPE",
-    )
+    private val compoundWords =
+        mapOf(
+            "DISPATCHNOTIFICATION" to "DISPATCH_NOTIFICATION",
+            "ORDERRESPONSE" to "ORDER_RESPONSE",
+            "ORDERCHANGE" to "ORDER_CHANGE",
+            "INVOICELIST" to "INVOICE_LIST",
+            "RECEIPTACKNOWLEDGEMENT" to "RECEIPT_ACKNOWLEDGEMENT",
+            "REMITTANCEADVICE" to "REMITTANCE_ADVICE",
+            "DOCEXCHANGE" to "DOC_EXCHANGE",
+            "DELIVERYNOTE" to "DELIVERY_NOTE",
+            "STARTVALUE" to "START_VALUE",
+            "ENDVALUE" to "END_VALUE",
+            "INTERVALTYPE" to "INTERVAL_TYPE",
+            "INTERVALVALUE" to "INTERVAL_VALUE",
+            "CONTENTTYPE" to "CONTENT_TYPE",
+            "XMLREPORT" to "XML_REPORT",
+            "BASE64BINARY" to "BASE64_BINARY",
+            "SHORTNAME" to "SHORT_NAME",
+            "SYMBOLREF" to "SYMBOL_REF",
+            "BOXNO" to "BOX_NO",
+            "ZIPBOX" to "ZIP_BOX",
+            "DESCR" to "DESCRIPTION",
+            "SERIALNUMBER" to "SERIAL_NUMBER",
+            "LASTUPDATE" to "LAST_UPDATE",
+            "RECURRINGTYPE" to "RECURRING_TYPE",
+        )
 
     /** Named simple types with large code lists stay strings. */
     val codeLists = setOf("dtPUNIT", "dtCURRENCIES", "dtLANG", "dtCOUNTRIES")
@@ -125,9 +129,18 @@ object Names {
     fun classOverride(key: String): String? = classOverrides[key]?.also { used += "class $key" }
 
     /** Final property name: per-class override, then global override, then the default. */
-    fun property(owner: String, defaultName: String): String {
-        propertyOverrides["$owner.$defaultName"]?.let { used += "property $owner.$defaultName"; return it }
-        globalPropertyOverrides[defaultName]?.let { used += "global $defaultName"; return it }
+    fun property(
+        owner: String,
+        defaultName: String,
+    ): String {
+        propertyOverrides["$owner.$defaultName"]?.let {
+            used += "property $owner.$defaultName"
+            return it
+        }
+        globalPropertyOverrides[defaultName]?.let {
+            used += "global $defaultName"
+            return it
+        }
         return defaultName
     }
 
@@ -139,7 +152,12 @@ object Names {
 
     /** "ORDER_ITEM" -> "OrderItem", "typePARTY_ID" -> "PartyId", "DISPATCHNOTIFICATION" -> "DispatchNotification". */
     fun className(xsdName: String): String {
-        val stripped = xsdName.removePrefix("type").removePrefix("dt").removePrefix("udx").ifEmpty { xsdName }
+        val stripped =
+            xsdName
+                .removePrefix("type")
+                .removePrefix("dt")
+                .removePrefix("udx")
+                .ifEmpty { xsdName }
         return words(stripped).joinToString("") { it.lowercase().replaceFirstChar(Char::uppercase) }
     }
 
@@ -168,12 +186,19 @@ object Names {
      */
     fun enumConstant(value: String): String {
         val words = value.replace(Regex("(?<=[a-z])(?=[A-Z])|(?<=[A-Za-z])(?=[0-9])"), "_")
-        val cleaned = words.uppercase().replace(Regex("[^A-Z0-9]+"), "_").trim('_').ifEmpty { "EMPTY" }
+        val cleaned =
+            words
+                .uppercase()
+                .replace(Regex("[^A-Z0-9]+"), "_")
+                .trim('_')
+                .ifEmpty { "EMPTY" }
         return if (cleaned.first().isDigit()) "V_$cleaned" else cleaned
     }
 
     private fun words(name: String): List<String> =
-        name.split('_', '-', '.').filter { it.isNotEmpty() }
+        name
+            .split('_', '-', '.')
+            .filter { it.isNotEmpty() }
             .flatMap { word -> compoundWords[word.uppercase()]?.split('_') ?: listOf(word) }
 }
 
@@ -182,7 +207,9 @@ object Names {
  * because `Datetime.class` and `DateTime.class` are the same file on
  * case-insensitive file systems (macOS, Windows).
  */
-class NameRegistry(reserved: Set<String> = emptySet()) {
+class NameRegistry(
+    reserved: Set<String> = emptySet(),
+) {
     private val used = reserved.map { it.lowercase() }.toMutableSet()
 
     fun claim(preferred: String): String {
