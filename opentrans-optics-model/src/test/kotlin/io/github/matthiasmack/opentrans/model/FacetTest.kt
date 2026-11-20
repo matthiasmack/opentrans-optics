@@ -27,9 +27,10 @@ class FacetTest {
 
     @Test
     fun `length of a shared class is checked in the containing class`() {
-        // MlString itself has no limit; bmecat:NAME inside ADDRESS allows 50 characters.
-        MlString("x".repeat(51))
-        assertEquals("ADDRESS/NAME: at most 50 characters, got 51", violation { Address(names = listOf(MlString("x".repeat(51)))) })
+        // MlString itself has no limit; bmecat:NAME inside ADDRESS allows 100 characters (ITscope; 50 in plain openTRANS).
+        MlString("x".repeat(101))
+        Address(names = listOf(MlString("x".repeat(100))))
+        assertEquals("ADDRESS/NAME: at most 100 characters, got 101", violation { Address(names = listOf(MlString("x".repeat(101)))) })
     }
 
     @Test

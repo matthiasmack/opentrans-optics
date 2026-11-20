@@ -1,14 +1,18 @@
 # opentrans-optics
 
-**openTRANS® 2.1 for Kotlin: type-safe and immutable, valid by construction.**
+**openTRANS® 2.1 for Kotlin, made for ITscope and its partners: type-safe and immutable, valid
+by construction.**
 Read, change, create and write business documents without null-check chains, index loops or
 invalid XML reaching your partners.
 
 All ten [openTRANS®](https://www.opentrans.org) 2.1 document types are covered: ORDER,
 ORDERRESPONSE, ORDERCHANGE, DISPATCHNOTIFICATION, RECEIPTACKNOWLEDGEMENT, INVOICE, INVOICELIST,
-REMITTANCEADVICE, RFQ and QUOTATION. They are immutable Kotlin data classes generated from the
-official XSD. You edit them with [Arrow optics](https://arrow-kt.io/learn/immutable-data/intro/)
-and create them with a Kotlin DSL.
+REMITTANCEADVICE, RFQ and QUOTATION, in the extended form that [ITscope](https://www.itscope.com)
+speaks: subscriptions and rentals, stock at order time, ESD, serial numbers with IMEI, references
+back to the order line and more. They are immutable Kotlin data classes generated from ITscope's
+schema. You edit them with [Arrow optics](https://arrow-kt.io/learn/immutable-data/intro/) and
+create them with a Kotlin DSL. For partners outside ITscope, every document can also be checked
+strictly against the official openTRANS schema.
 
 > **Status: early and unpublished.** Version `0.1.0-SNAPSHOT`. The API may still change, and
 > nothing is on Maven Central yet. For now you build it from source (see [Building](#building)).
@@ -40,7 +44,7 @@ val order = order(id = "PO-1001", date = LocalDate.now()) {
 
 Party references, roles, line item ids, line amounts and order totals are filled in for you. Plain
 values just work: `LocalDate`, `"2026-11-17"`, `100`, `2.5` or `"0.15"`. Need the full depth of the
-standard? Every one of the 191 classes has its own generated builder, from `Order { }` down to
+standard? Every one of the 196 classes has its own generated builder, from `Order { }` down to
 `ProductPriceFix { }`. A forgotten required value tells you exactly which XML element is missing.
 
 ### Change anything, anywhere, in one line
@@ -60,7 +64,7 @@ val order: Order = OpenTransXml.readAs(xml)
 val discounted = Order.orderItems.every.productPriceFix.notNull.priceAmount
     .modify(order) { it * BigDecimal("0.9") }
 
-// derive the invoice and write it, validated against the official XSD
+// derive the invoice and write it, validated against the schema
 val invoice = discounted.toInvoice(id = "INV-1", date = LocalDate.now(), vatRate = "0.19")
 val out = OpenTransXml.write(invoice)
 ```
@@ -91,8 +95,33 @@ elements. An invalid value fails the moment it is created, and the message tells
 ORDER_INFO/ORDER_ID: at most 250 characters, got 251
 ```
 
-On top of that, every document is validated against the official schema when it is read and
-again before it is written. Invalid XML never enters your system and never leaves it.
+On top of that, every document is validated against the schema when it is read and again before
+it is written. Invalid XML never enters your system and never leaves it.
+
+### Everything ITscope speaks, typed
+
+ITscope extends openTRANS with what the standard never got: subscriptions, rentals, stock
+levels, ESD, IMEI serial numbers, references back to the order line, optional quotation items.
+Here they are ordinary, typed parts of the model, no XML digging required:
+
+```kotlin
+val order: Order = OpenTransXml.readAs(fromItscope)
+
+val item = order.orderItems.first()
+val months = item.contractInformation?.subscriptionPeriod       // e.g. 12
+val unit = item.contractInformation?.subscriptionPeriodUnit     // RecurringType.MON
+val stock = item.productStockFix?.stockAmount                   // stock when the order was placed
+val esd = item.productId.productType == ProductType.ESD
+```
+
+Writing validates against ITscope's schema by default. One argument switches to the official
+openTRANS schema for every partner outside ITscope, and any ITscope-only content is reported
+before the document leaves:
+
+```kotlin
+OpenTransXml.write(order)                       // ITscope
+OpenTransXml.write(order, Profile.OPENTRANS)    // strictly official openTRANS 2.1
+```
 
 ### Types that tell the truth
 
@@ -277,7 +306,7 @@ follow the JVM locale.
 
 ### Work with the full model
 
-The order DSL covers the everyday order. For everything else, every one of the 191 classes has a
+The order DSL covers the everyday order. For everything else, every one of the 196 classes has a
 generated builder, from `Order { }` and `Invoice { }` down to `ProductPriceFix { }`. Your IDE's
 completion shows what is possible at each level.
 
@@ -326,9 +355,16 @@ in `Names.kt`).
 
 ## Design decisions
 
-- **Generated from the official XSD.** Model, reader, writer and builders all come from one
-  generator. They cannot drift apart, and the full standard is covered rather than a hand-picked
-  subset. Generated code is never edited by hand. Changes go into the generator.
+- **Generated from the schema.** Model, reader, writer and builders all come from one generator.
+  They cannot drift apart, and the full schema is covered rather than a hand-picked subset.
+  Generated code is never edited by hand. Changes go into the generator.
+- **ITscope first, openTRANS always possible.** The library is made for ITscope and its partners,
+  so the model is generated from ITscope's extended openTRANS 2.1 schema. That schema is a
+  superset of the official one: every valid openTRANS document is valid for ITscope too. The
+  official schema ships as well, and the `OPENTRANS` profile checks a document strictly against
+  it for partners outside ITscope. The price of the superset: limits that ITscope relaxes (longer
+  names, an optional payment method) are relaxed in the model as well, and only the `OPENTRANS`
+  profile enforces the stricter official ones, when the document is read or written.
 - **Strict in both directions.** Validating on read means the reader can rely on element order
   and cardinality. Validating on write means nothing invalid reaches a partner. The XSD's
   rules for single values (lengths, patterns, allowed values, number ranges) are also checked
@@ -371,9 +407,11 @@ The bundled XSDs (in `opentrans-optics-xml`, under
 `src/main/resources/io/github/matthiasmack/opentrans/xsd`) are not covered by the MIT license.
 They are redistributed unchanged, with the copyright notices in their file headers:
 
-- `opentrans_2_1.xsd`: © 2000–2009 Fraunhofer IAO and Universität Duisburg-Essen BLI
-- `bmecat_2005.xsd`: © 2005 BME e.V. (BMEcat® 2005)
-- `xmldsig-core-schema.xsd`, `xmlmime.xsd`: © W3C, under the W3C Software License
+- `2.1/opentrans_2_1.xsd`: © 2000–2009 Fraunhofer IAO and Universität Duisburg-Essen BLI
+- `2.1/bmecat_2005.xsd`: © 2005 BME e.V. (BMEcat® 2005)
+- `itscope/opentrans_2_1.xsd`, `itscope/bmecat_2005.xsd`: ITscope's extended versions of the two
+  files above (download of 2026-11), based on openTRANS® 2.1 and BMEcat® 2005
+- `xmldsig-core-schema.xsd`, `xmlmime.xsd` (in both folders): © W3C, under the W3C Software License
 
 openTRANS® is a registered trademark of the Fraunhofer-Gesellschaft e.V., BMEcat® of BME e.V.
 This project is not affiliated with or endorsed by either of them.

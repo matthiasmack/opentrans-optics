@@ -40,9 +40,11 @@ val DOCUMENT_ROOTS = listOf(
  *   Attributes are properties too. A required attribute with a single allowed
  *   value (`version="2.1"`) is fixed and not modelled.
  * - **Simple content.** string -> `String`, decimal -> `BigDecimal`, integer
- *   -> `Int`, dtBOOLEAN -> `Boolean`, dtDATETIME -> `DateTime`. Simple content
+ *   -> `Int`, dtBOOLEAN (BMEcat's or openTRANS's) -> `Boolean`, dtDATETIME -> `DateTime`. Simple content
  *   with attributes -> a small class with `value` plus the attributes.
- * - **Enumerations.** Closed enumerations -> Kotlin enum with the XML value.
+ * - **Enumerations.** Closed enumerations -> Kotlin enum with the XML value. An
+ *   anonymous restriction that keeps the values of a named enumeration reuses
+ *   that enum (ITscope's dtRECURRINGTYPE -> one `RecurringType`).
  *   Patterns ending in `|\w{1,n}` are open -> `String`. Large code lists
  *   ([Names.codeLists]) stay `String`, with their values checked as a facet.
  * - **Wrappers.** An element without attributes whose content is exactly one
@@ -92,7 +94,8 @@ class IrBuilder(private val model: XSModel) {
         reusableBase(t)?.let { return classForNamedType(it) }
 
         return classesByKey.getOrPut(e.qname) {
-            val name = typeNames.claim(Names.classOverride(e.name) ?: elementBaseName(e))
+            val qualified = (if (e.namespace == BMECAT_NS) "bmecat:" else "opentrans:") + e.name
+            val name = typeNames.claim(Names.classOverride(qualified) ?: Names.classOverride(e.name) ?: elementBaseName(e))
             newClass(name, e.name, e.qname).also { cls -> pending += { fill(cls, t) } }
         }
     }
@@ -330,6 +333,8 @@ class IrBuilder(private val model: XSModel) {
         else -> error("unexpected type for ${e.name}")
     }
 
+    private fun enumValues(t: XSSimpleTypeDefinition) = (0 until t.lexicalEnumeration.length).map { t.lexicalEnumeration.item(it) }
+
     private fun simpleType(t: XSSimpleTypeDefinition, enumName: String, origin: String): KType {
         if (t.variety != XSSimpleTypeDefinition.VARIETY_ATOMIC) return KType.Scalar(ScalarKind.STRING)
         val chain = generateSequence<XSTypeDefinition>(t) { it.baseType?.takeIf { b -> b !== it } }.toList()
@@ -338,12 +343,17 @@ class IrBuilder(private val model: XSModel) {
         if (names.any { it.second in Names.codeLists }) return KType.Scalar(ScalarKind.STRING)
         val values = (0 until t.lexicalEnumeration.length).map { t.lexicalEnumeration.item(it) }
         if (values.size in 1..60) {
-            return KType.Enum(enumsByType.getOrPut(t) {
-                EnumDef(typeNames.claim(Names.classOverride(origin) ?: enumName), origin, values).also { enums += it }
+            // An anonymous restriction that keeps the values of a named enumeration reuses that enum.
+            val named = chain.filterIsInstance<XSSimpleTypeDefinition>().firstOrNull { !it.anonymous && enumValues(it) == values }
+            val key = named ?: t
+            return KType.Enum(enumsByType.getOrPut(key) {
+                val (name, from) = if (named != null) Names.className(named.name) to named.name else enumName to origin
+                EnumDef(typeNames.claim(Names.classOverride(from) ?: name), from, values).also { enums += it }
             })
         }
         if (names.any { it == (BMECAT_NS to "dtDATETIME") }) return KType.Scalar(ScalarKind.DATETIME)
-        if (names.any { it == (BMECAT_NS to "dtBOOLEAN") }) return KType.Scalar(ScalarKind.BOOLEAN)
+        // dtBOOLEAN exists in both namespaces ("true"/"false" in any case).
+        if (names.any { it.second == "dtBOOLEAN" }) return KType.Scalar(ScalarKind.BOOLEAN)
         val builtin = names.firstOrNull { it.first == XSD_NS }?.second
         return KType.Scalar(
             when (builtin) {

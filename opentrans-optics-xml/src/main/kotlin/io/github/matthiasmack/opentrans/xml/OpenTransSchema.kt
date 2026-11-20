@@ -18,23 +18,41 @@ import javax.xml.validation.Schema
 import javax.xml.validation.SchemaFactory
 
 /**
- * The bundled openTRANS 2.1 schema (plus BMEcat 2005, xmlmime, xmldsig).
+ * Which schema a document is validated against.
+ *
+ * The model is generated from ITscope's schema, which is a superset of the
+ * official one: every valid openTRANS 2.1 document is also valid for ITscope.
+ * [OPENTRANS] is for partners outside ITscope that expect the official schema.
+ */
+enum class Profile(internal val directory: String) {
+    /** ITscope's extended openTRANS 2.1, the default. */
+    ITSCOPE("itscope"),
+
+    /** The official openTRANS 2.1 / BMEcat 2005 schema. */
+    OPENTRANS("2.1"),
+}
+
+/**
+ * The bundled schemas, one set per [Profile] (each with BMEcat 2005, xmlmime, xmldsig).
  *
  * Hardening: neither the schema nor the validated documents may load anything
  * from outside. Schema imports are served from the classpath by [ClasspathResolver];
  * every other external access (DTDs, entities, remote schemas) is refused.
  */
 object OpenTransSchema {
-    private const val BASE = "/io/github/matthiasmack/opentrans/xsd/2.1/"
+    private const val BASE = "/io/github/matthiasmack/opentrans/xsd/"
     private const val ROOT = "opentrans_2_1.xsd"
 
-    val schema: Schema by lazy { load() }
+    private val schemas = Profile.entries.associateWith { profile -> lazy { load(profile) } }
 
-    /** Validates [xml] and throws [OpenTransValidationException] listing all errors. */
-    fun validate(xml: String) {
+    /** The compiled schema of [profile]. */
+    fun schema(profile: Profile = Profile.ITSCOPE): Schema = schemas.getValue(profile).value
+
+    /** Validates [xml] against [profile] and throws [OpenTransValidationException] listing all errors. */
+    fun validate(xml: String, profile: Profile = Profile.ITSCOPE) {
         rejectDoctype(xml)
         val errors = mutableListOf<String>()
-        val validator = schema.newValidator().apply {
+        val validator = schema(profile).newValidator().apply {
             setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "")
             setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "")
             errorHandler = CollectingErrorHandler(errors)
@@ -77,27 +95,27 @@ object OpenTransSchema {
         setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false)
     }
 
-    private fun load(): Schema {
+    private fun load(profile: Profile): Schema {
+        val directory = BASE + profile.directory + "/"
         val factory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI).apply {
             setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
             setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "")
             setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "")
-            resourceResolver = ClasspathResolver
+            resourceResolver = ClasspathResolver(directory)
         }
-        val root = resource(ROOT)
-        return factory.newSchema(StreamSource(root, ROOT))
+        return factory.newSchema(StreamSource(resource(directory, ROOT), ROOT))
     }
 
-    private fun resource(name: String): InputStream =
-        OpenTransSchema::class.java.getResourceAsStream(BASE + name)
-            ?: error("Bundled schema file missing: $BASE$name")
+    private fun resource(directory: String, name: String): InputStream =
+        OpenTransSchema::class.java.getResourceAsStream(directory + name)
+            ?: error("Bundled schema file missing: $directory$name")
 
     /**
      * Serves the imported schemas from the classpath. The DTD referenced by
      * xmldsig-core-schema.xsd only declares entities the schema never uses,
      * so it is answered with an empty document instead of being downloaded.
      */
-    private object ClasspathResolver : LSResourceResolver {
+    private class ClasspathResolver(private val directory: String) : LSResourceResolver {
         private val bundled = setOf("bmecat_2005.xsd", "xmlmime.xsd", "xmldsig-core-schema.xsd")
 
         override fun resolveResource(
@@ -106,7 +124,7 @@ object OpenTransSchema {
             val name = systemId?.substringAfterLast('/')
             return when {
                 name in bundled -> {
-                    Input(publicId, name, resource(name!!))
+                    Input(publicId, name, resource(directory, name!!))
                 }
                 type == "http://www.w3.org/TR/REC-xml" -> {
                     Input(publicId, systemId, InputStream.nullInputStream())

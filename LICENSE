@@ -24,5 +24,6 @@ The XML Schema files in
 opentrans-optics-xml/src/main/resources/io/github/matthiasmack/opentrans/xsd
 are not covered by this license. They are copyright Fraunhofer IAO and
 Universität Duisburg-Essen BLI (openTRANS), BME e.V. (BMEcat) and W3C (xmldsig,
-xmlmime), and are redistributed unchanged under the terms stated in their file
-headers.
+xmlmime); the files in the itscope folder are ITscope's extended versions of
+the openTRANS and BMEcat schemas. All are redistributed unchanged under the
+terms stated in their file headers.

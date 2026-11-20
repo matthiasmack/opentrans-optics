@@ -10,7 +10,7 @@ dependencies {
     implementation(libs.kotlinpoet)
 }
 
-val schemaDir = rootProject.layout.projectDirectory.dir("opentrans-optics-xml/src/main/resources/io/github/matthiasmack/opentrans/xsd/2.1")
+val schemaDir = rootProject.layout.projectDirectory.dir("opentrans-optics-xml/src/main/resources/io/github/matthiasmack/opentrans/xsd/itscope")
 
 tasks.register<JavaExec>("inventory") {
     description = "Prints which XSD constructs are reachable from the openTRANS document roots."

@@ -79,8 +79,9 @@ class GeneratedModelTest {
     @Test
     fun `prisms into generated choices`() {
         val method = Order.orderHeader.orderInfo.payment.notNull.method
-        assertEquals("4111", method.card.cardNum.getOrNull(order))
-        assertNull(method.card.cardNum.getOrNull(method.set(order, Debit(true))))
+        // ITscope makes the payment method optional, hence notNull.
+        assertEquals("4111", method.notNull.card.cardNum.getOrNull(order))
+        assertNull(method.notNull.card.cardNum.getOrNull(method.set(order, Debit(true))))
 
         val days = Order.orderHeader.orderInfo.payment.notNull.paymentTerms.notNull.timesForPayment.every.due.days.value
         assertEquals(listOf(10), days.getAll(order))

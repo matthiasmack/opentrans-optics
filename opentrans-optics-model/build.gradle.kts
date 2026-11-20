@@ -17,7 +17,7 @@ dependencies {
     codegen(project(":codegen"))
 }
 
-val schemaDir = rootProject.layout.projectDirectory.dir("opentrans-optics-xml/src/main/resources/io/github/matthiasmack/opentrans/xsd/2.1")
+val schemaDir = rootProject.layout.projectDirectory.dir("opentrans-optics-xml/src/main/resources/io/github/matthiasmack/opentrans/xsd/itscope")
 val generatedDir = layout.buildDirectory.dir("generated/opentrans/kotlin")
 
 val generateModel = tasks.register<JavaExec>("generateModel") {

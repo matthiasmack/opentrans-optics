@@ -3,7 +3,9 @@ package io.github.matthiasmack.opentrans.codegen
 /*
  * Naming rules and the override table for names the rules get wrong.
  * Keys are XSD names: an element or named type, "PARENT#n" for the n-th
- * choice inside PARENT (counted from 1), "PARENT#n/FIRST..." for a sequence
+ * choice inside PARENT (counted from 1). An element key may carry its
+ * namespace ("opentrans:PARAMETER", "bmecat:PARAMETER") when the same local
+ * name exists in both; "PARENT#n/FIRST..." for a sequence
  * alternative of that choice, and "ELEMENT+" for a repeated choice
  * alternative. Every override must be used; the generator fails otherwise,
  * so the table cannot silently go stale when the rules change.
@@ -42,6 +44,9 @@ object Names {
         "MIME#1" to "MimeContent",
         "MIME#1/MIME_SOURCE..." to "MimeSources",
         "MIME_EMBEDDED+" to "MimeEmbeddedList",
+        // ITscope adds an openTRANS PARAMETER (CONTRACT_INFORMATION); BMEcat's PARAMETER keeps its name.
+        "opentrans:PARAMETER" to "ContractParameter",
+        "bmecat:PARAMETER" to "Parameter",
     )
 
     /** Hand-written types in the model package; generated names must never collide with them. */
@@ -106,6 +111,9 @@ object Names {
         "BOXNO" to "BOX_NO",
         "ZIPBOX" to "ZIP_BOX",
         "DESCR" to "DESCRIPTION",
+        "SERIALNUMBER" to "SERIAL_NUMBER",
+        "LASTUPDATE" to "LAST_UPDATE",
+        "RECURRINGTYPE" to "RECURRING_TYPE",
     )
 
     /** Named simple types with large code lists stay strings. */
@@ -154,9 +162,13 @@ object Names {
         }
     }
 
-    /** "standard" -> "STANDARD", "invoice-list" -> "INVOICE_LIST", "04" -> "V_04". */
+    /**
+     * "standard" -> "STANDARD", "invoice-list" -> "INVOICE_LIST", "04" -> "V_04",
+     * "expressSaturday10" -> "EXPRESS_SATURDAY_10".
+     */
     fun enumConstant(value: String): String {
-        val cleaned = value.uppercase().replace(Regex("[^A-Z0-9]+"), "_").trim('_').ifEmpty { "EMPTY" }
+        val words = value.replace(Regex("(?<=[a-z])(?=[A-Z])|(?<=[A-Za-z])(?=[0-9])"), "_")
+        val cleaned = words.uppercase().replace(Regex("[^A-Z0-9]+"), "_").trim('_').ifEmpty { "EMPTY" }
         return if (cleaned.first().isDigit()) "V_$cleaned" else cleaned
     }
 

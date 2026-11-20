@@ -12,7 +12,7 @@ dependencies {
     testImplementation(testFixtures(project(":opentrans-optics-model")))
 }
 
-val schemaDir = layout.projectDirectory.dir("src/main/resources/io/github/matthiasmack/opentrans/xsd/2.1")
+val schemaDir = layout.projectDirectory.dir("src/main/resources/io/github/matthiasmack/opentrans/xsd/itscope")
 val generatedDir = layout.buildDirectory.dir("generated/opentrans/kotlin")
 
 val generateXml = tasks.register<JavaExec>("generateXml") {
