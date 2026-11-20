@@ -112,6 +112,36 @@ val months = item.contractInformation?.subscriptionPeriod       // e.g. 12
 val unit = item.contractInformation?.subscriptionPeriodUnit     // RecurringType.MON
 val stock = item.productStockFix?.stockAmount                   // stock when the order was placed
 val esd = item.productId.productType == ProductType.ESD
+val ownDeliveryNote = order.dropshipment                        // UDX.DROPSHIPMENT
+```
+
+Creating them is just as direct. The order DSL knows ITscope's fields and keeps the totals the
+way ITscope expects them, with recurring items summed per billing unit:
+
+```kotlin
+val order = order(id = "PO-1", date = LocalDate.now()) {
+    // buyer, supplier, ...
+    dropshipment()                                      // ship with your own delivery note
+    item(quantity = 1, unit = "MON") {
+        supplierPid("123002", "supplier_specific")
+        price("49.99")
+        contract(period = 12, unit = RecurringType.MON, billing = 1)   // 12 months, billed monthly
+    }
+    item(quantity = 1, unit = "C62") {
+        supplierPid("123003", "supplier_specific")
+        productType = ProductType.ESD
+        price("1158.00")
+    }
+    item(quantity = 1, unit = "C62") {
+        supplierPid("SAMPLE_SUPPLIER_ID", "supplier_specific")
+        price("510.00")
+        bundle(partsListVisible = true) {                 // one item, several parts
+            component(quantity = 1, unit = "C62") { supplierPid("13113721000") }
+            component(quantity = 1, unit = "C62") { supplierPid("1000001211000") }
+        }
+    }
+}
+val problems = ItScopeRules.violations(order)   // ORDER_ID length, complete addresses, article numbers
 ```
 
 Writing validates against ITscope's schema by default. One argument switches to the official
@@ -193,7 +223,7 @@ order(id = "PO-1002", date = LocalDate.now()) {
 
 | Module                   | Contents                                                                              |
 |--------------------------|---------------------------------------------------------------------------------------|
-| `opentrans-optics-model` | data classes, Arrow optics, XSD rules checked on creation, `XmlContent`, the UDX API |
+| `opentrans-optics-model` | data classes, Arrow optics, XSD rules checked on creation, `XmlContent`, the UDX API, ITscope's UDX and rules |
 | `opentrans-optics-xml`   | `OpenTransXml`: read, write and validate; bundled XSDs                                |
 | `opentrans-optics-dsl`   | generated builders, `order { }`, deriving follow-up documents                        |
 | `codegen`                | XSD → Kotlin generator, runs at build time and is not a runtime dependency           |
@@ -265,6 +295,14 @@ val dispatch = order.toDispatchNotification(id = "DN-1", date = "2026-11-24", qu
 val invoice  = order.toInvoice(id = "INV-1", date = "2026-11-30", vatRate = "0.19")
 ```
 
+Like ITscope's own responses, `toOrderResponse` refers each item back to its order line. Pass
+`referenceLines = false` for a response that has to be plain openTRANS.
+
+Before an order goes to ITscope, `ItScopeRules.violations(order)` lists everything ITscope's
+order API checks beyond the schema: an ORDER_ID of at most 18 characters, complete buyer and
+delivery addresses (name, street, ZIP code, country) and a supplier article number on every item.
+An empty list means ITscope will accept the order on these points.
+
 Then write it as a `String`, to an `OutputStream`, a `Writer` or a file:
 
 ```kotlin
@@ -273,8 +311,9 @@ OpenTransXml.write(invoice, Path.of("out/INV-1.xml"))
 OpenTransXml.write(invoice, httpResponse.outputStream)
 ```
 
-Output is always UTF-8 and is validated against the XSD before it is handed out. Streams you
-pass in are flushed but not closed.
+Output is always UTF-8 and is validated against the schema of the profile (ITscope unless you
+pass `Profile.OPENTRANS`) before it is handed out. Streams you pass in are flushed but not
+closed.
 
 ### Handle errors
 
@@ -324,9 +363,13 @@ Names follow the XML, so you find them from the specification:
 ### Typed UDX reference
 
 A `UdxType` (see [What you get](#what-you-get)) declares fields with `required`, `optional`,
-`list` (with `min` and `max`), `attribute` and `optionalAttribute`. Simple types are `string`
-(length, pattern), `int` and `decimal` (range), `boolean`, `date`, `dateTime` and `enum`, or a
-`SimpleType` of your own. Another `UdxType` can be used as a field type for nested elements.
+`list` (with `min` and `max`), `attribute`, `optionalAttribute` and `text` (the element's own
+value, next to attributes). Simple types are `string` (length, pattern), `int` and `decimal`
+(range), `boolean`, `date`, `dateTime` and `enum`, or a `SimpleType` of your own; outside a
+declaration they are available as `SimpleTypes.boolean()` etc. Another `UdxType` can be used as a
+field type for nested elements. A UDX element that holds just a value takes one line:
+`UdxType.value("UDX.DROPSHIPMENT", SimpleTypes.boolean())`. ITscope's own UDX are ready-made in
+`ItScopeUdx`.
 
 On UDX content: `content[Type]` reads one value, `getAll` reads all of them, and `with` /
 `withAll` set them in place. The optic `udx(Type)` works on any UDX property, including across
@@ -388,7 +431,8 @@ in `Names.kt`).
   `dispatchNotificationId`, and choices are named after what they hold (`OrderItem.delivery`,
   `Feature.value`). The XML stays exactly as the standard defines it.
 - **UDX as an extension point.** The library cannot know which extensions its users have, so it
-  ships none. It gives you the means to describe your own instead. UDX rarely comes with a
+  ships none of theirs, only the ones ITscope documents (`ItScopeUdx`). It gives you the means to
+  describe your own instead. UDX rarely comes with a
   schema, so none is required. A type is described explicitly in Kotlin, without reflection,
   annotations or compiler plugins.
 - **Secure parsing.** No DTDs, no external entities. The bundled schemas are loaded from the

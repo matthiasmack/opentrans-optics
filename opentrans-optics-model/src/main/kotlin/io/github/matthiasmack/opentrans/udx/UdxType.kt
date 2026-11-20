@@ -34,6 +34,9 @@ import javax.xml.namespace.QName
  * - Writing checks the same rules, so an invalid value never enters a document.
  * - A UdxType can be the type of a field of another UdxType (nested elements);
  *   then the field gives the element name.
+ * - An element that holds just a value (`<UDX.DROPSHIPMENT>true</UDX.DROPSHIPMENT>`)
+ *   declares a [text] field, possibly next to attributes; [UdxType.value]
+ *   creates such a type in one line.
  */
 abstract class UdxType<T>(val name: QName) : UdxValueType<T> {
     constructor(localName: String, namespace: String = "") : this(QName(namespace, localName))
@@ -51,7 +54,7 @@ abstract class UdxType<T>(val name: QName) : UdxValueType<T> {
 
     // --- fields ---
 
-    /** A field of a UDX type; declare it with [required], [optional], [list], [attribute] or [optionalAttribute]. */
+    /** A field of a UDX type; declare it with [required], [optional], [list], [attribute], [optionalAttribute] or [text]. */
     class Field<T, V> internal constructor(
         internal val localName: String,
         internal val kind: Kind,
@@ -60,7 +63,7 @@ abstract class UdxType<T>(val name: QName) : UdxValueType<T> {
         internal val min: Int,
         internal val max: Int?,
     ) {
-        internal enum class Kind { ELEMENT, ATTRIBUTE }
+        internal enum class Kind { ELEMENT, ATTRIBUTE, TEXT }
     }
 
     /** Child element that must occur exactly once. */
@@ -85,8 +88,17 @@ abstract class UdxType<T>(val name: QName) : UdxValueType<T> {
     protected fun <V : Any> optionalAttribute(name: String, get: (T) -> V?, type: SimpleType<V>): Field<T, V?> =
         add(Field(name, Field.Kind.ATTRIBUTE, get, type, 0, 1))
 
+    /**
+     * The element's own text: `<UDX.DROPSHIPMENT>true</UDX.DROPSHIPMENT>`. Can be
+     * combined with attributes, not with child elements.
+     */
+    protected fun <V> text(get: (T) -> V, type: SimpleType<V>): Field<T, V> =
+        add(Field("#text", Field.Kind.TEXT, get, type, 1, 1))
+
     private fun <V> add(field: Field<T, V>): Field<T, V> {
         require(fields.none { it.localName == field.localName && it.kind == field.kind }) { "${name.localPart}: ${field.localName} is declared twice" }
+        val kinds = (fields.map { it.kind } + field.kind).toSet()
+        require(!(Field.Kind.TEXT in kinds && Field.Kind.ELEMENT in kinds)) { "${name.localPart}: text and child elements cannot be combined" }
         fields += field
         return field
     }
@@ -94,57 +106,25 @@ abstract class UdxType<T>(val name: QName) : UdxValueType<T> {
     // --- simple types, for use in field declarations ---
 
     protected fun string(minLength: Int? = null, maxLength: Int? = null, pattern: Regex? = null): SimpleType<String> =
-        SimpleType("string", { it }, { it }) { value ->
-            val length = value.codePointCount(0, value.length)
-            when {
-                minLength != null && length < minLength -> "at least $minLength characters, got $length"
-                maxLength != null && length > maxLength -> "at most $maxLength characters, got $length"
-                pattern != null && !pattern.matches(value) -> "'$value' does not match ${pattern.pattern}"
-                else -> null
-            }
-        }
+        SimpleTypes.string(minLength, maxLength, pattern)
 
-    protected fun int(min: Int? = null, max: Int? = null): SimpleType<Int> =
-        SimpleType("integer", { it.trim().toInt() }, Int::toString) { value ->
-            when {
-                min != null && value < min -> "at least $min, got $value"
-                max != null && value > max -> "at most $max, got $value"
-                else -> null
-            }
-        }
+    protected fun int(min: Int? = null, max: Int? = null): SimpleType<Int> = SimpleTypes.int(min, max)
 
-    protected fun decimal(min: BigDecimal? = null, max: BigDecimal? = null): SimpleType<BigDecimal> =
-        SimpleType("decimal", { BigDecimal(it.trim()) }, BigDecimal::toPlainString) { value ->
-            when {
-                min != null && value < min -> "at least $min, got $value"
-                max != null && value > max -> "at most $max, got $value"
-                else -> null
-            }
-        }
+    protected fun decimal(min: BigDecimal? = null, max: BigDecimal? = null): SimpleType<BigDecimal> = SimpleTypes.decimal(min, max)
 
     /** `true` / `false`, read in any case like bmecat:dtBOOLEAN. */
-    protected fun boolean(): SimpleType<Boolean> = SimpleType("boolean", {
-        when (it.trim().lowercase()) {
-            "true" -> true
-            "false" -> false
-            else -> throw IllegalArgumentException("'$it' is not true or false")
-        }
-    }, Boolean::toString)
+    protected fun boolean(): SimpleType<Boolean> = SimpleTypes.boolean()
 
     /** ISO date, `2026-11-17`. */
-    protected fun date(): SimpleType<LocalDate> = SimpleType("date", { LocalDate.parse(it.trim()) }, LocalDate::toString)
+    protected fun date(): SimpleType<LocalDate> = SimpleTypes.date()
 
     /** bmecat:dtDATETIME, as in the rest of the model. */
-    protected fun dateTime(): SimpleType<DateTime> = SimpleType("date-time", { DateTime(it.trim()) }, DateTime::value)
+    protected fun dateTime(): SimpleType<DateTime> = SimpleTypes.dateTime()
 
     /** Enum written as [xml] of each constant (its name by default). */
-    protected inline fun <reified E : Enum<E>> enum(noinline xml: (E) -> String = { it.name }): SimpleType<E> =
-        enumType(enumValues<E>().toList(), xml)
+    protected inline fun <reified E : Enum<E>> enum(noinline xml: (E) -> String = { it.name }): SimpleType<E> = SimpleTypes.enum(xml)
 
-    protected fun <E : Enum<E>> enumType(values: List<E>, xml: (E) -> String): SimpleType<E> {
-        val byXml = values.associateBy(xml)
-        return SimpleType("one of ${byXml.keys}", { byXml[it.trim()] ?: throw IllegalArgumentException("'$it' is not one of ${byXml.keys}") }, xml)
-    }
+    protected fun <E : Enum<E>> enumType(values: List<E>, xml: (E) -> String): SimpleType<E> = SimpleTypes.enumType(values, xml)
 
     // --- reading and writing ---
 
@@ -172,12 +152,21 @@ abstract class UdxType<T>(val name: QName) : UdxValueType<T> {
 
         element.elements.firstOrNull { it.name !in elementFields }?.let { throw UdxViolationException("$path: unknown element ${it.name.localPart}") }
         element.attributes.keys.firstOrNull { it !in attributeFields }?.let { throw UdxViolationException("$path: unknown attribute ${it.localPart}") }
-        if (element.text.isNotBlank()) throw UdxViolationException("$path: text is not allowed here, got '${element.text.trim()}'")
+        val hasText = fields.any { it.kind == Field.Kind.TEXT }
+        if (!hasText && element.text.isNotBlank()) throw UdxViolationException("$path: text is not allowed here, got '${element.text.trim()}'")
 
         val values = HashMap<Field<*, *>, Any?>()
         for (field in fields) {
-            val fieldPath = if (field.kind == Field.Kind.ATTRIBUTE) "$path/@${field.localName}" else "$path/${field.localName}"
+            val fieldPath = when (field.kind) {
+                Field.Kind.ATTRIBUTE -> "$path/@${field.localName}"
+                Field.Kind.TEXT -> path
+                Field.Kind.ELEMENT -> "$path/${field.localName}"
+            }
             values[field] = when (field.kind) {
+                Field.Kind.TEXT -> {
+                    if (element.text.isBlank()) throw UdxViolationException("$path: a value is missing")
+                    (field.type as SimpleType<*>).parse(element.text, path)
+                }
                 Field.Kind.ATTRIBUTE -> {
                     val text = element.attribute(field.localName)
                     when {
@@ -213,6 +202,7 @@ abstract class UdxType<T>(val name: QName) : UdxValueType<T> {
         for (field in fields) {
             val fieldValue = field.get(value)
             when (field.kind) {
+                Field.Kind.TEXT -> children += XmlText(formatValue(field.type as SimpleType<*>, fieldValue, path))
                 Field.Kind.ATTRIBUTE -> {
                     val fieldPath = "$path/@${field.localName}"
                     if (fieldValue != null) attributes[QName(field.localName)] = formatValue(field.type as SimpleType<*>, fieldValue, fieldPath)
@@ -255,6 +245,78 @@ abstract class UdxType<T>(val name: QName) : UdxValueType<T> {
     private fun formatValue(type: SimpleType<*>, value: Any?, path: String): String = (type as SimpleType<Any?>).format(value, path)
 
     override fun toString() = "UdxType(${name.localPart})"
+
+    companion object {
+        /**
+         * A UDX element that holds just a value, e.g.
+         * `val DROPSHIPMENT = UdxType.value("UDX.DROPSHIPMENT", SimpleTypes.boolean())`.
+         */
+        fun <V> value(localName: String, type: SimpleType<V>, namespace: String = ""): UdxType<V> =
+            object : UdxType<V>(localName, namespace) {
+                private val value = text({ it }, type)
+                override fun create(v: Values): V = v[value]
+            }
+    }
+}
+
+/**
+ * The simple types for UDX fields, also usable outside a [UdxType] declaration
+ * (e.g. for [UdxType.value]). Inside a declaration the same factories are
+ * available without the prefix.
+ */
+object SimpleTypes {
+    fun string(minLength: Int? = null, maxLength: Int? = null, pattern: Regex? = null): SimpleType<String> =
+        SimpleType("string", { it }, { it }) { value ->
+            val length = value.codePointCount(0, value.length)
+            when {
+                minLength != null && length < minLength -> "at least $minLength characters, got $length"
+                maxLength != null && length > maxLength -> "at most $maxLength characters, got $length"
+                pattern != null && !pattern.matches(value) -> "'$value' does not match ${pattern.pattern}"
+                else -> null
+            }
+        }
+
+    fun int(min: Int? = null, max: Int? = null): SimpleType<Int> =
+        SimpleType("integer", { it.trim().toInt() }, Int::toString) { value ->
+            when {
+                min != null && value < min -> "at least $min, got $value"
+                max != null && value > max -> "at most $max, got $value"
+                else -> null
+            }
+        }
+
+    fun decimal(min: BigDecimal? = null, max: BigDecimal? = null): SimpleType<BigDecimal> =
+        SimpleType("decimal", { BigDecimal(it.trim()) }, BigDecimal::toPlainString) { value ->
+            when {
+                min != null && value < min -> "at least $min, got $value"
+                max != null && value > max -> "at most $max, got $value"
+                else -> null
+            }
+        }
+
+    /** `true` / `false`, read in any case like bmecat:dtBOOLEAN. */
+    fun boolean(): SimpleType<Boolean> = SimpleType("boolean", {
+        when (it.trim().lowercase()) {
+            "true" -> true
+            "false" -> false
+            else -> throw IllegalArgumentException("'$it' is not true or false")
+        }
+    }, Boolean::toString)
+
+    /** ISO date, `2026-11-17`. */
+    fun date(): SimpleType<LocalDate> = SimpleType("date", { LocalDate.parse(it.trim()) }, LocalDate::toString)
+
+    /** bmecat:dtDATETIME, as in the rest of the model. */
+    fun dateTime(): SimpleType<DateTime> = SimpleType("date-time", { DateTime(it.trim()) }, DateTime::value)
+
+    /** Enum written as [xml] of each constant (its name by default). */
+    inline fun <reified E : Enum<E>> enum(noinline xml: (E) -> String = { it.name }): SimpleType<E> =
+        enumType(enumValues<E>().toList(), xml)
+
+    fun <E : Enum<E>> enumType(values: List<E>, xml: (E) -> String): SimpleType<E> {
+        val byXml = values.associateBy(xml)
+        return SimpleType("one of ${byXml.keys}", { byXml[it.trim()] ?: throw IllegalArgumentException("'$it' is not one of ${byXml.keys}") }, xml)
+    }
 }
 
 /** Type of a UDX field: a [SimpleType] (text) or another [UdxType] (nested element). */

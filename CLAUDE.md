@@ -30,7 +30,8 @@ JDK 25, Kotlin, Gradle wrapper, versions in `gradle/libs.versions.toml`.
 - All Kotlin code lives under the package `io.github.matthiasmack.opentrans` (directories
   `io/github/matthiasmack/opentrans/...`). Below, packages are named relative to it.
 - `opentrans-optics-model/`: the generated model in `.model`. Hand-written there: `Types.kt`
-  (`DateTime`), `Facets.kt`, `XmlContent.kt` (free XML tree), and `.udx` (UdxType API).
+  (`DateTime`), `Facets.kt`, `XmlContent.kt` (free XML tree), `.udx` (UdxType API) and `.itscope`
+  (ITscope's UDX, `ItScopeRules`).
 - `opentrans-optics-xml/`: the generated reader and writer (internal). Hand-written: `XmlIn`, `XmlOut`,
   `OpenTransSchema` (validation profiles, hardening) and `OpenTransXml` (public API). The XSDs are
   in `src/main/resources/io/github/matthiasmack/opentrans/xsd/`: `itscope/` (ITscope's schema,
@@ -57,8 +58,9 @@ JDK 25, Kotlin, Gradle wrapper, versions in `gradle/libs.versions.toml`.
   outside the library.
 - **XML names never change.** Renaming only touches Kotlin names. Round-trip tests
   (`DocumentRoundTripTest`) guard this.
-- **UDX is a user extension point.** The library ships no UDX dialect. Example types live only in
-  test fixtures. Every UDX feature must work for third-party types nobody here knows.
+- **UDX is a user extension point.** The library ships no user's UDX dialect, only the UDX that
+  ITscope documents (`.itscope.ItScopeUdx`). Example types live only in test fixtures. Every UDX
+  feature must work for third-party types nobody here knows.
 - Prefer explicit code over reflection, annotations or compiler plugins (except Arrow's KSP).
 - **Exceptions:** a problem with a document or its data throws a subclass of `OpenTransException`
   (`model/Exceptions.kt`). A missing required value is an `IncompleteDocumentException` with the

@@ -1,5 +1,6 @@
 package io.github.matthiasmack.opentrans.dsl
 
+import io.github.matthiasmack.opentrans.model.OrderReference
 import io.github.matthiasmack.opentrans.model.IncompleteDocumentException
 import io.github.matthiasmack.opentrans.model.DispatchNotification
 import io.github.matthiasmack.opentrans.model.Invoice
@@ -23,13 +24,17 @@ import java.math.RoundingMode
 /**
  * ORDERRESPONSE confirming the order as it is: same items, quantities and prices.
  *
+ * Each item refers back to its order line (ORDER_REFERENCE with ORDER_ID and
+ * LINE_ITEM_ID), as ITscope does. That element is ITscope-only; pass
+ * `referenceLines = false` for a response that must be valid plain openTRANS.
+ *
  * ```
  * val response = order.toOrderResponse(date = LocalDate.now()) {
  *     orderResponseHeader { ... }   // optional overrides
  * }
  * ```
  */
-fun Order.toOrderResponse(date: Any, block: OrderResponseBuilder.() -> Unit = {}): OrderResponse {
+fun Order.toOrderResponse(date: Any, referenceLines: Boolean = true, block: OrderResponseBuilder.() -> Unit = {}): OrderResponse {
     val info = orderHeader.orderInfo
     val items = orderItems
     return OrderResponse {
@@ -52,6 +57,7 @@ fun Order.toOrderResponse(date: Any, block: OrderResponseBuilder.() -> Unit = {}
                 orderUnit = item.orderUnit
                 productPriceFix = item.productPriceFix
                 priceLineAmount = item.priceLineAmount
+                if (referenceLines) orderReference = OrderReference(orderId = info.orderId, lineItemId = item.lineItemId)
             }
         }
         orderResponseSummary {
