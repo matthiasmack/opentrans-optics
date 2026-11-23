@@ -87,6 +87,13 @@ class DeriveTest {
 
         val noPrice = spikeOrder.copy(orderItems = spikeOrder.orderItems.map { it.copy(productPriceFix = null, priceLineAmount = null) })
         assertFailsWith<IncompleteDocumentException> { noPrice.toInvoice("I", "2026-11-30", "0.19") }
+
+        // A line amount alone is not enough: an invoice item needs its unit price.
+        val onlyLineAmount = spikeOrder.copy(orderItems = spikeOrder.orderItems.map { it.copy(productPriceFix = null) })
+        val error =
+            assertFailsWith<IncompleteDocumentException> { onlyLineAmount.toInvoice(id = "I", date = "2026-11-30", vatRate = "0.19") }
+        assertEquals("ORDER_ITEM/PRODUCT_PRICE_FIX", error.element)
+        assertEquals("Item 1 has no price; an invoice needs one for every item", error.message)
     }
 
     @Test

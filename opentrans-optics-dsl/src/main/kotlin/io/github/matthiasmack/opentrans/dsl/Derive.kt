@@ -7,6 +7,7 @@ import io.github.matthiasmack.opentrans.model.Order
 import io.github.matthiasmack.opentrans.model.OrderItem
 import io.github.matthiasmack.opentrans.model.OrderReference
 import io.github.matthiasmack.opentrans.model.OrderResponse
+import io.github.matthiasmack.opentrans.model.ProductPriceFix
 import io.github.matthiasmack.opentrans.model.ShipmentPartiesReference
 import io.github.matthiasmack.opentrans.model.TaxDetailsFix
 import java.math.BigDecimal
@@ -151,8 +152,8 @@ fun Order.toInvoice(
     val rate = BigDecimal(vatRate)
     val currency =
         info.currency ?: throw IncompleteDocumentException("ORDER_INFO/CURRENCY", "The order has no CURRENCY; an invoice needs one")
-    val lines = orderItems.map { it to lineAmount(it) }
-    val net = lines.map { it.second }.reduce(BigDecimal::add)
+    val lines = orderItems.map { item -> unitPrice(item).let { price -> Triple(item, price, lineAmount(item, price)) } }
+    val net = lines.map { it.third }.reduce(BigDecimal::add)
     val tax = net.multiply(rate).setScale(2, RoundingMode.HALF_UP)
     val vat = TaxDetailsFix(taxType = "vat", taxCategory = "standard_rate", tax = rate)
 
@@ -174,16 +175,13 @@ fun Order.toInvoice(
                 orderDate = info.orderDate
             }
         }
-        for ((item, amount) in lines) {
+        for ((item, price, amount) in lines) {
             invoiceItem {
                 lineItemId = item.lineItemId
                 productId = item.productId
                 quantity = item.quantity
                 orderUnit = item.orderUnit
-                productPriceFix =
-                    item.productPriceFix!!.let { price ->
-                        if (price.taxDetailsFixes.isEmpty()) price.copy(taxDetailsFixes = listOf(vat)) else price
-                    }
+                productPriceFix = if (price.taxDetailsFixes.isEmpty()) price.copy(taxDetailsFixes = listOf(vat)) else price
                 priceLineAmount = amount
                 orderReference {
                     orderId = info.orderId
@@ -201,14 +199,20 @@ fun Order.toInvoice(
     }
 }
 
-private fun lineAmount(item: OrderItem): BigDecimal {
+/** The unit price every invoice item needs (PRODUCT_PRICE_FIX is required there), even if the order item has a line amount. */
+private fun unitPrice(item: OrderItem): ProductPriceFix =
+    item.productPriceFix
+        ?: throw IncompleteDocumentException(
+            "ORDER_ITEM/PRODUCT_PRICE_FIX",
+            "Item ${item.lineItemId} has no price; an invoice needs one for every item",
+        )
+
+/** The order's line amount, or quantity x price / price quantity. */
+private fun lineAmount(
+    item: OrderItem,
+    price: ProductPriceFix,
+): BigDecimal {
     item.priceLineAmount?.let { return it }
-    val price =
-        item.productPriceFix
-            ?: throw IncompleteDocumentException(
-                "ORDER_ITEM/PRODUCT_PRICE_FIX",
-                "Item ${item.lineItemId} has no price; an invoice needs one for every item",
-            )
     val perUnit = price.priceQuantity ?: BigDecimal.ONE
     return item.quantity.multiply(price.priceAmount).divide(perUnit, maxOf(price.priceAmount.scale(), 2), RoundingMode.HALF_UP)
 }
