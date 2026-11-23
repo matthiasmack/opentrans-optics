@@ -3,10 +3,12 @@
 Kotlin library for openTRANS 2.1 documents (read, edit with Arrow optics, create with a DSL, write),
 made primarily for ITscope and its partners: the model is generated from ITscope's extended
 openTRANS schema, a superset of the official one.
-README.md presents the library: features, usage and the section "Design decisions". **Keep that
-section current**: a new or changed design decision goes there, in general terms (what and why),
-not as a changelog. The XSD -> Kotlin mapping rules are documented on `IrBuilder`. History lives
-in git.
+README.md presents the library in a short, punchy style (intro, stack, quick start, what you get,
+architecture); docs/GUIDE.md is the reference (receiving, sending, errors, full model, UDX,
+ITscope, operations). **Keep the README's "Architecture" section current**: a new or changed
+design decision goes there as prose (what, why, the trade-off), not as a changelog. New API goes
+into the guide. Examples in both use named arguments and must compile. The XSD -> Kotlin mapping
+rules are documented on `IrBuilder`. History lives in git.
 
 ## Commands
 
@@ -68,7 +70,7 @@ JDK 25, Kotlin, Gradle wrapper, versions in `gradle/libs.versions.toml`.
   (`model/Exceptions.kt`). A missing required value is an `IncompleteDocumentException` with the
   XML path in `element`. Wrong use of the API (a block given twice, a contradictory `UdxType`)
   stays a plain `IllegalStateException` / `IllegalArgumentException`. Don't add new exception
-  types without a reason the README's error table can explain.
+  types without a reason the guide's error table (docs/GUIDE.md) can explain.
 - Hand-written names must not collide case-insensitively with generated ones: macOS treats
   `Datetime.class` and `DateTime.class` as the same file. Reserve new hand-written model types in
   `Names.reserved`.
